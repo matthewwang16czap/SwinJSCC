@@ -455,8 +455,8 @@ if __name__ == "__main__":
     logger.info(config.__dict__)
     torch.manual_seed(seed=config.seed)
     net = SwinJSCC(args, config)
-    # model_path = "./checkpoints/SwinJSCC_w_SAandRA_AWGN_HRimage_cbr_psnr_snr.model"
-    # load_weights(model_path)
+    model_path = "./checkpoints/SwinJSCC_w_SAandRA_AWGN_HRimage_cbr_psnr_snr.model"
+    load_weights(model_path)
     net = net.cuda()
     model_params = [{"params": net.parameters(), "lr": 0.0001}]
     train_loader, test_loader = get_loader(args, config)
