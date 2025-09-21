@@ -33,12 +33,12 @@ def logger_configuration(config, save_log=False, test_mode=False):
     # 配置 logger
     logger = logging.getLogger("Deep joint source channel coder")
     if test_mode:
-        config.workdir += '_test'
+        config.workdir += "_test"
     if save_log:
         makedirs(config.workdir)
         makedirs(config.samples)
         makedirs(config.models)
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s] %(message)s')
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s] %(message)s")
     stdhandler = logging.StreamHandler()
     stdhandler.setLevel(logging.INFO)
     stdhandler.setFormatter(formatter)
@@ -52,17 +52,19 @@ def logger_configuration(config, save_log=False, test_mode=False):
     config.logger = logger
     return config.logger
 
+
 def makedirs(directory):
-    if not os.path.exists(directory):
-        os.makedirs(directory)
+    os.makedirs(os.path.dirname(directory), exist_ok=True)
+
 
 def save_model(model, save_path):
+    makedirs(save_path)
     torch.save(model.state_dict(), save_path)
 
 
 def seed_torch(seed=1029):
     random.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)  # 为了禁止hash随机化，使得实验可复现
+    os.environ["PYTHONHASHSEED"] = str(seed)  # 为了禁止hash随机化，使得实验可复现
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
