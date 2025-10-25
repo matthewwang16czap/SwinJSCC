@@ -1,0 +1,28 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Train SwinJSCC",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",          // entry script
+            "console": "integratedTerminal",
+            "args": [
+                "--trainset", "DIV2K",
+                "--testset", "kodak",
+                "--distortion-metric", "MSE",
+                "--model", "SwinJSCC_w/_SAandRA",
+                "--channel-type", "awgn",
+                "--C", "32,64,96,128,192",
+                "--multiple-snr", "1,4,7,10,13",
+                "--model_size", "base",
+                // "--denoise",
+                "--training",
+                // "--denoise-training"
+            ]
+        }
+    ]
+}

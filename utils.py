@@ -62,6 +62,12 @@ def save_model(model, save_path):
     torch.save(model.state_dict(), save_path)
 
 
+def load_weights(net, model_path):
+    pretrained = torch.load(model_path)
+    net.load_state_dict(pretrained, strict=False)
+    del pretrained
+
+
 def seed_torch(seed=1029):
     random.seed(seed)
     os.environ["PYTHONHASHSEED"] = str(seed)  # 为了禁止hash随机化，使得实验可复现
