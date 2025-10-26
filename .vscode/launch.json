@@ -19,9 +19,9 @@
                 "--C", "32,64,96,128,192",
                 "--multiple-snr", "1,4,7,10,13",
                 "--model_size", "base",
-                // "--denoise",
+                "--denoise",
                 "--training",
-                // "--denoise-training"
+                "--denoise-training"
             ]
         }
     ]
