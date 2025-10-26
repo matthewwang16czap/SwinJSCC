@@ -42,6 +42,7 @@ class SwinJSCC(nn.Module):
             UNet1D(
                 channels=encoder_kwargs["embed_dims"][-1],
                 hidden=encoder_kwargs["embed_dims"][-1],
+                factor=1,
             )
             if args.denoise
             else None

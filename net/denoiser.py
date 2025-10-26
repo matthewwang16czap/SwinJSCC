@@ -65,7 +65,13 @@ class UNet1D(nn.Module):
     """
 
     def __init__(
-        self, channels=320, hidden=320, num_groups=8, depth=3, use_sigmoid=True
+        self,
+        channels=320,
+        hidden=320,
+        num_groups=8,
+        depth=3,
+        factor=2,
+        use_sigmoid=True,
     ):
         super().__init__()
         assert depth >= 1, "depth must be >= 1"
@@ -78,7 +84,7 @@ class UNet1D(nn.Module):
         enc_layers = []
         in_ch = hidden
         for _ in range(depth):
-            out_ch = in_ch * 2  # double channels each time
+            out_ch = in_ch * factor  # double channels each time
             enc_layers.append(DownBlock(in_ch, out_ch, num_groups))
             in_ch = out_ch
         self.encoders = nn.ModuleList(enc_layers)
@@ -90,7 +96,7 @@ class UNet1D(nn.Module):
         # Decoder (mirror of encoder)
         dec_layers = []
         for _ in range(depth):
-            out_ch = bottleneck_ch // 2
+            out_ch = bottleneck_ch // factor
             dec_layers.append(UpBlock(bottleneck_ch, out_ch, num_groups))
             bottleneck_ch = out_ch
         self.decoders = nn.ModuleList(dec_layers)
@@ -120,10 +126,10 @@ class UNet1D(nn.Module):
             skip = skips.pop(-1)
             x = dec(x)
             # align temporal length before skip connection
-            # if x.size(-1) != skip.size(-1):
-            #     x = F.interpolate(
-            #         x, size=skip.size(-1), mode="linear", align_corners=False
-            #     )
+            if x.size(-1) != skip.size(-1):
+                x = F.interpolate(
+                    x, size=skip.size(-1), mode="linear", align_corners=False
+                )
             x = x + skip  # skip connection
 
         # Output layer
