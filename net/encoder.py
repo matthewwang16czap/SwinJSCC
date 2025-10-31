@@ -78,7 +78,7 @@ class SwinTransformerBlock(nn.Module):
         else:
             attn_mask = None
 
-        self.register_buffer("attn_mask", attn_mask)
+        self.register_buffer("attn_mask", attn_mask, persistent=True)
 
     def forward(self, x):
 
@@ -180,7 +180,9 @@ class SwinTransformerBlock(nn.Module):
             attn_mask = attn_mask.masked_fill(
                 attn_mask != 0, float(-100.0)
             ).masked_fill(attn_mask == 0, float(0.0))
-            self.attn_mask = attn_mask
+            # Register/overwrite buffer so it's tracked and moved with the module
+            # register_buffer will (re)register the buffer; this is OK and ensures proper device
+            self.register_buffer("attn_mask", attn_mask, persistent=True)
         else:
             pass
 
@@ -538,8 +540,9 @@ def create_encoder(**kwargs):
 
 
 def build_model(config):
-    input_image = torch.ones([1, 256, 256]).to(config.device)
+    input_image = torch.ones([1, 256, 256], device=config.device)
     model = create_encoder(**config.encoder_kwargs)
+    model.to(config.device)
     model(input_image)
     num_params = 0
     for param in model.parameters():
