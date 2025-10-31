@@ -161,15 +161,15 @@ if __name__ == "__main__":
         for epoch in range(steps_epoch, config.tot_epoch):
 
             # debug
-            for name, buf in net.named_buffers():
-                rank = dist.get_rank() if dist.is_initialized() else 0
-                print(f"[rank{dist.get_rank()}] buffer {name} shape={tuple(buf.shape)}")
-                print(
-                    f"[rank{rank}] input_resolution per layer:",
-                    [layer.input_resolution for layer in net.module.encoder.layers],
-                )
-            if dist.is_initialized():
-                dist.barrier()
+            # for name, buf in net.named_buffers():
+            #     rank = dist.get_rank() if dist.is_initialized() else 0
+            #     print(f"[rank{dist.get_rank()}] buffer {name} shape={tuple(buf.shape)}")
+            #     print(
+            #         f"[rank{rank}] input_resolution per layer:",
+            #         [layer.input_resolution for layer in net.module.encoder.layers],
+            #     )
+            # if dist.is_initialized():
+            #     dist.barrier()
 
             if train_sampler is not None:
                 train_sampler.set_epoch(epoch)

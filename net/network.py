@@ -5,6 +5,7 @@ from net.channel import Channel
 from random import choice
 import torch
 import torch.nn as nn
+import torch.distributed as dist
 from net.denoiser import UNet1D
 from loss.denoise import denoise_loss_fn
 

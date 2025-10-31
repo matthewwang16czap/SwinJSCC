@@ -77,7 +77,7 @@ class BasicLayer(nn.Module):
         self.input_resolution = (H, W)
         for _, blk in enumerate(self.blocks):
             blk.input_resolution = (H, W)
-            blk.update_mask()
+
         if self.upsample is not None:
             self.upsample.input_resolution = (H, W)
 
