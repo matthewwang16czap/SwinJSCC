@@ -18,6 +18,8 @@ class Config:
         self.plot_step = 10000
         self.filename = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.workdir = f"./history/{self.filename}"
+        # self.homedir = "/home/matthewwang16czap/"
+        self.homedir = "/home/gexin/"
         self.log = f"{self.workdir}/Log_{self.filename}.log"
         self.samples = f"{self.workdir}/samples"
         self.models = f"{self.workdir}/models"
@@ -52,8 +54,8 @@ class Config:
     def _setup_cifar10(self, args):
         self.save_model_freq = 5
         self.image_dims = (3, 32, 32)
-        self.train_data_dir = "/home/matthewwang16czap/datasets/CIFAR10/"
-        self.test_data_dir = "/home/matthewwang16czap/datasets/CIFAR10/"
+        self.train_data_dir = self.homedir + "datasets/CIFAR10/"
+        self.test_data_dir = self.homedir + "datasets/CIFAR10/"
         self.batch_size = 128
         self.downsample = 2
         self.channel_number = int(args.C)
@@ -92,7 +94,7 @@ class Config:
     def _setup_div2k(self, args):
         self.save_model_freq = 10
         self.image_dims = (3, 256, 256)
-        base_path = "/home/matthewwang16czap/datasets/DIV2K/"
+        base_path = self.homedir + "datasets/DIV2K/"
         self.train_data_dir = [
             f"{base_path}/clic2020/**",
             f"{base_path}/clic2021/train",
@@ -106,9 +108,9 @@ class Config:
 
         # Testset options
         testset_map = {
-            "kodak": ["/home/matthewwang16czap/datasets/Kodak/"],
-            "CLIC21": ["/home/matthewwang16czap/datasets/clic2021/test/"],
-            "ffhq": ["/home/matthewwang16czap/datasets/ffhq/"],
+            "kodak": [self.homedir + "datasets/Kodak/"],
+            "CLIC21": [self.homedir + "datasets/clic2021/test/"],
+            "ffhq": [self.homedir + "datasets/ffhq/"],
         }
         self.test_data_dir = testset_map.get(args.testset, [])
 
