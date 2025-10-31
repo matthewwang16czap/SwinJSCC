@@ -144,11 +144,12 @@ if __name__ == "__main__":
 
     # --- Optimizer ---
     # Effective lr
-    lr = (
-        ddp_env["world_size"] * config.learning_rate
-        if ddp_env["world_size"] > 1
-        else config.learning_rate
-    )
+    # lr = (
+    #     ddp_env["world_size"] * config.learning_rate
+    #     if ddp_env["world_size"] > 1
+    #     else config.learning_rate
+    # )
+    lr = config.learning_rate
     model_params = [{"params": net.parameters(), "lr": lr}]
     optimizer = optim.Adam(model_params, lr=lr)
 
@@ -158,6 +159,18 @@ if __name__ == "__main__":
     # --- Train or Test ---
     if args.training or args.denoise_training:
         for epoch in range(steps_epoch, config.tot_epoch):
+
+            # debug
+            for name, buf in net.named_buffers():
+                rank = dist.get_rank() if dist.is_initialized() else 0
+                print(f"[rank{dist.get_rank()}] buffer {name} shape={tuple(buf.shape)}")
+                print(
+                    f"[rank{rank}] input_resolution per layer:",
+                    [layer.input_resolution for layer in net.module.encoder.layers],
+                )
+            if dist.is_initialized():
+                dist.barrier()
+
             if train_sampler is not None:
                 train_sampler.set_epoch(epoch)
             if args.training:
