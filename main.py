@@ -92,7 +92,7 @@ if __name__ == "__main__":
     # load_weights(net, model_path)
     net = net.cuda()
 
-    model_params = [{"params": net.parameters(), "lr": 0.0001}]
+    model_params = [{"params": net.parameters(), "lr": config.learning_rate}]
     train_loader, test_loader = get_loader(args, config)
     optimizer = optim.Adam(model_params, lr=config.learning_rate)
     global_step = 0

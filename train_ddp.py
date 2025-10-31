@@ -143,8 +143,14 @@ if __name__ == "__main__":
     )
 
     # --- Optimizer ---
-    model_params = [{"params": net.parameters(), "lr": config.learning_rate}]
-    optimizer = optim.Adam(model_params, lr=config.learning_rate)
+    # Effective lr
+    lr = (
+        ddp_env["world_size"] * config.learning_rate
+        if ddp_env["world_size"] > 1
+        else config.learning_rate
+    )
+    model_params = [{"params": net.parameters(), "lr": lr}]
+    optimizer = optim.Adam(model_params, lr=lr)
 
     global_step = 0
     steps_epoch = global_step // len(train_loader)
