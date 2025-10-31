@@ -94,8 +94,7 @@ if __name__ == "__main__":
 
     model_params = [{"params": net.parameters(), "lr": 0.0001}]
     train_loader, test_loader = get_loader(args, config)
-    cur_lr = config.learning_rate
-    optimizer = optim.Adam(model_params, lr=cur_lr)
+    optimizer = optim.Adam(model_params, lr=config.learning_rate)
     global_step = 0
     steps_epoch = global_step // train_loader.__len__()
     if args.training or args.denoise_training:

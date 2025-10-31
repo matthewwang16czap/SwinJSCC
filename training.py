@@ -20,7 +20,7 @@ def train_one_epoch(
 
         # Handle different data formats
         input = data[0] if args.trainset == "CIFAR10" else data
-        input = input.cuda()
+        input = input.to(config.device, non_blocking=True)
 
         # Forward pass
         (
@@ -107,7 +107,8 @@ def test(net, test_loader, CalcuSSIM, logger, args, config):
                     start_time = time.time()
                     # Handle different data formats
                     input = data[0]
-                    input = input.cuda()
+                    input = input.to(config.device, non_blocking=True)
+
                     (
                         recon_image,
                         restored_feature,
@@ -179,7 +180,7 @@ def train_one_epoch_denoiser(
 
         # Handle different data formats
         input = data[0] if args.trainset == "CIFAR10" else data
-        input = input.cuda()
+        input = input.to(config.device, non_blocking=True)
 
         # Forward pass
         (
