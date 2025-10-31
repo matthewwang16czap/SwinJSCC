@@ -15,7 +15,7 @@ def masked_mse_loss(pred, target, mask):
 
 def masked_orthogonal_loss(pred, target, mask):
     error = (target - pred) ** 2
-    M = (target**2) * error  # weight error by true feature energy
+    M = (pred**2) * error
     M = M * mask
     loss = M.sum() / mask.sum().clamp(min=1)
     return loss

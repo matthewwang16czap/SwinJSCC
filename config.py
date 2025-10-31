@@ -29,6 +29,7 @@ class Config:
         # --- Training details ---
         self.normalize = False
         self.learning_rate = 1e-4
+        self.alpha_losses = [1e-1, 10, 1e-2, 1, 1e-3, 1e-3]
         self.tot_epoch = 10_000_000
 
         # --- Model toggles ---

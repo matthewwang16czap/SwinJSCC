@@ -9,7 +9,7 @@ import torch
 import argparse
 from loss.distortion import *
 from config import Config
-from training import train_one_epoch, test
+from training import *
 
 
 if __name__ == "__main__":
@@ -82,7 +82,7 @@ if __name__ == "__main__":
         CalcuSSIM = MS_SSIM(data_range=1.0, levels=4, channel=3).cuda()
 
     seed_torch()
-    logger = logger_configuration(config, save_log=False)
+    logger = logger_configuration(config, save_log=True)
     logger.info(config.__dict__)
     torch.manual_seed(seed=config.seed)
     net = SwinJSCC(args, config)
@@ -92,40 +92,37 @@ if __name__ == "__main__":
     # load_weights(net, model_path)
     net = net.cuda()
 
-    if args.training:
-        if args.denoise_training:
-            # Freeze all parameters except feature_denoiser
-            for name, param in net.named_parameters():
-                if "feature_denoiser" not in name:
-                    param.requires_grad = False
-                else:
-                    param.requires_grad = True
-        else:
-            # Freeze feature_denoiser
-            for name, param in net.named_parameters():
-                if "feature_denoiser" in name:
-                    param.requires_grad = False
-                else:
-                    param.requires_grad = True
-
     model_params = [{"params": net.parameters(), "lr": 0.0001}]
     train_loader, test_loader = get_loader(args, config)
     cur_lr = config.learning_rate
     optimizer = optim.Adam(model_params, lr=cur_lr)
     global_step = 0
     steps_epoch = global_step // train_loader.__len__()
-    if args.training:
+    if args.training or args.denoise_training:
         for epoch in range(steps_epoch, config.tot_epoch):
-            global_step = train_one_epoch(
-                epoch,
-                global_step,
-                net,
-                train_loader,
-                optimizer,
-                CalcuSSIM,
-                logger,
-                args,
-                config,
+            global_step = (
+                train_one_epoch(
+                    epoch,
+                    global_step,
+                    net,
+                    train_loader,
+                    optimizer,
+                    CalcuSSIM,
+                    logger,
+                    args,
+                    config,
+                )
+                if args.training
+                else train_one_epoch_denoiser(
+                    epoch,
+                    global_step,
+                    net,
+                    train_loader,
+                    optimizer,
+                    logger,
+                    args,
+                    config,
+                )
             )
             if (epoch + 1) % config.save_model_freq == 0:
                 save_model(

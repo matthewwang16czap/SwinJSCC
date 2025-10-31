@@ -113,12 +113,24 @@ class SwinJSCC(nn.Module):
         )
         loss_G = self.distortion_loss.forward(input_image, recon_image.clamp(0.0, 1.0))
 
-        # for training denoiser only
-        denoise_loss, _, _ = self.denoise_loss(
-            restored_feature, feature, mask, alpha=0, beta=1.0
-        )
+        # # for training denoiser only
+        # denoise_loss, _, _ = self.denoise_loss(
+        #     restored_feature, feature, mask, alpha=0, beta=1.0
+        # )
 
-        if self.config.denoise_training:
-            return recon_image, CBR, chan_param, mse.mean(), denoise_loss
-        else:
-            return recon_image, CBR, chan_param, mse.mean(), loss_G.mean()
+        # if self.config.denoise_training:
+        #     return recon_image, CBR, chan_param, mse.mean(), denoise_loss
+        # else:
+        #     return recon_image, CBR, chan_param, mse.mean(), loss_G.mean()
+
+        return (
+            recon_image,
+            restored_feature,
+            noisy_feature,
+            feature,
+            mask,
+            CBR,
+            chan_param,
+            mse.mean(),
+            loss_G.mean(),
+        )
