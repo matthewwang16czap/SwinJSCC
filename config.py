@@ -92,7 +92,7 @@ class Config:
         )
 
     def _setup_div2k(self, args):
-        self.save_model_freq = 10
+        self.save_model_freq = 100
         self.image_dims = (3, 256, 256)
         base_path = self.homedir + "datasets/DIV2K/"
         self.train_data_dir = [
