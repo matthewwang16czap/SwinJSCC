@@ -154,11 +154,11 @@ def test(net, test_loader, CalcuSSIM, logger, args, config):
             for t in metrics:
                 t.clear()
 
-    print("SNR: {}".format(results_snr.tolist()))
-    print("CBR: {}".format(results_cbr.tolist()))
-    print("PSNR: {}".format(results_psnr.tolist()))
-    print("MS-SSIM: {}".format(results_msssim.tolist()))
-    print("Finish Test!")
+    logger.info(f"SNR: {results_snr.tolist()}")
+    logger.info(f"CBR: {results_cbr.tolist()}")
+    logger.info(f"PSNR: {results_psnr.tolist()}")
+    logger.info(f"MS-SSIM: {results_msssim.tolist()}")
+    logger.info("Finish Test!")
 
 
 def train_one_epoch_denoiser(
