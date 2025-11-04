@@ -1,5 +1,6 @@
 from torch.utils.data import Dataset
 from PIL import Image
+import random
 
 # import cv2
 import os
@@ -97,8 +98,9 @@ class CIFAR10(Dataset):
 
 # ---------------- Worker Seed ---------------- #
 def worker_init_fn_seed(worker_id):
-    torch.manual_seed(42 + worker_id)
-    np.random.seed(42 + worker_id)
+    worker_seed = torch.initial_seed() % 2**32
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
 
 
 def get_loader(args, config, rank=None, world_size=None):

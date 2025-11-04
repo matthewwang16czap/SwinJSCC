@@ -117,21 +117,21 @@ if __name__ == "__main__":
     else:
         CalcuSSIM = MS_SSIM(data_range=1.0, levels=4, channel=3).to(config.device)
 
-    seed_torch()
+    base_seed = 42 + ddp_env["rank"]  # Different seed per GPU
+    seed_torch(base_seed)
+
     logger = logger_configuration(
         config, save_log=(ddp_env["rank"] == 0)
     )  # only rank 0 logs
     if ddp_env["rank"] == 0:
         logger.info(config.__dict__)
 
-    torch.manual_seed(seed=config.seed)
-
     # --- Model ---
     net = SwinJSCC(args, config).to(config.device)
     # model_path = "./checkpoints/SwinJSCC_w_SAandRA_AWGN_HRimage_cbr_psnr_snr.model"
-    # model_path = "./checkpoints/pretrained.model"
+    model_path = "./checkpoints/fix_snr_fix_cbr_model.model"
     # model_path = "history/2025-09-28 18:57:35/models/2025-09-28 18:57:35_EP50.model"
-    # load_weights(net, model_path)
+    load_weights(net, model_path)
 
     ### DDP CHANGE — wrap model
     if ddp_env["world_size"] > 1:
