@@ -192,6 +192,7 @@ if __name__ == "__main__":
                     net,
                     train_loader,
                     optimizer,
+                    CalcuSSIM,
                     logger,
                     args,
                     config,

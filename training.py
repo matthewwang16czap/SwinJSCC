@@ -162,10 +162,21 @@ def test(net, test_loader, CalcuSSIM, logger, args, config):
 
 
 def train_one_epoch_denoiser(
-    epoch, global_step, net, train_loader, optimizer, logger, args, config
+    epoch, global_step, net, train_loader, optimizer, CalcuSSIM, logger, args, config
 ):
     net.train()
-    elapsed, losses = [AverageMeter() for _ in range(2)]
+    # Initialize metric meters
+    metric_names = [
+        "elapsed",
+        "losses",
+        "cbrs",
+        "snrs",
+        "psnr_recon",
+        "msssim_recon",
+        "psnr_no_noise",
+        "msssim_no_noise",
+    ]
+    metrics = {name: AverageMeter() for name in metric_names}
 
     # --- Freeze encoder/channel ---
     for name, param in net.named_parameters():
@@ -245,18 +256,51 @@ def train_one_epoch_denoiser(
         total_loss.backward()
         optimizer.step()
 
+        # ---------------------- Metric computation ---------------------- #
+        metrics["elapsed"].update(time.time() - start_time)
+        metrics["losses"].update(total_loss.item())
+        metrics["cbrs"].update(CBR)
+        metrics["snrs"].update(SNR)
+
+        # --- PSNR and MSSSIM for recon_image ---
+        if mse.item() > 0:
+            psnr_recon = 10 * (torch.log(255.0 * 255.0 / mse) / np.log(10))
+            metrics["psnr_recon"].update(psnr_recon.item())
+
+            msssim_recon = (
+                1 - CalcuSSIM(input, recon_image.clamp(0.0, 1.0)).mean().item()
+            )
+            metrics["msssim_recon"].update(msssim_recon)
+
+        # --- PSNR and MSSSIM for no_noise_recon_image ---
+        mse_no_noise = torch.mean((input - no_noise_recon_image) ** 2)
+        if mse_no_noise.item() > 0:
+            psnr_no_noise = 10 * (torch.log(255.0 * 255.0 / mse_no_noise) / np.log(10))
+            metrics["psnr_no_noise"].update(psnr_no_noise.item())
+
+            msssim_no_noise = (
+                1 - CalcuSSIM(input, no_noise_recon_image.clamp(0.0, 1.0)).mean().item()
+            )
+            metrics["msssim_no_noise"].update(msssim_no_noise)
+
         # ---------------------- Logging ---------------------- #
-        elapsed.update(time.time() - start_time)
-        losses.update(total_loss.item())
-        if (global_step % config.print_step) == 0:
+        if global_step % config.print_step == 0:
             logger.info(
                 f"[Epoch {epoch} | Step {global_step}] "
-                f"Loss {losses.val:.4f} ({losses.avg:.4f}) "
+                f"Loss {metrics['losses'].val:.4f} ({metrics['losses'].avg:.4f}) | "
+                f"CBR {metrics['cbrs'].val:.4f} ({metrics['cbrs'].avg:.4f}) | "
+                f"SNR {metrics['snrs'].val:.2f} ({metrics['snrs'].avg:.2f}) | "
+                f"PSNR(recon) {metrics['psnr_recon'].val:.3f} ({metrics['psnr_recon'].avg:.3f}) | "
+                f"MSSSIM(recon) {metrics['msssim_recon'].val:.3f} ({metrics['msssim_recon'].avg:.3f}) | "
+                f"PSNR(no-noise) {metrics['psnr_no_noise'].val:.3f} ({metrics['psnr_no_noise'].avg:.3f}) | "
+                f"MSSSIM(no-noise) {metrics['msssim_no_noise'].val:.3f} ({metrics['msssim_no_noise'].avg:.3f}) | "
                 f"Orth {orth_loss.item():.4f} | MSE {mse_loss.item():.4f} | "
-                f"MeanReg {noise_mean_reg.item():.6f} | Self {self_loss.item():.4f} |"
-                f"NoNoiseRecon {no_noise_recon_loss.item():.4f} | Recon {loss_G.item():.4f} |"
+                f"MeanReg {noise_mean_reg.item():.6f} | Self {self_loss.item():.4f} | "
+                f"NoNoiseRecon {no_noise_recon_loss.item():.4f} | Recon {loss_G.item():.4f}"
             )
-            elapsed.clear()
-            losses.clear()
+
+            # Reset metrics after each print interval
+            for m in metrics.values():
+                m.clear()
 
     return global_step

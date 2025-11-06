@@ -20,6 +20,7 @@ class Config:
         self.workdir = f"./history/{self.filename}"
         # self.homedir = "/home/matthewwang16czap/"
         self.homedir = "/home/gexin/"
+        # self.homedir = "/public/home/sihanwang/"
         self.log = f"{self.workdir}/Log_{self.filename}.log"
         self.samples = f"{self.workdir}/samples"
         self.models = f"{self.workdir}/models"
