@@ -165,6 +165,11 @@ def train_one_epoch_denoiser(
     epoch, global_step, net, train_loader, optimizer, CalcuSSIM, logger, args, config
 ):
     net.train()
+
+    # Check if model is wrapped in DDP
+    is_ddp = hasattr(net, "module")
+    model = net.module if is_ddp else net
+
     # Initialize metric meters
     metric_names = [
         "elapsed",
@@ -179,7 +184,7 @@ def train_one_epoch_denoiser(
     metrics = {name: AverageMeter() for name in metric_names}
 
     # --- Freeze encoder/channel ---
-    for name, param in net.named_parameters():
+    for name, param in model.named_parameters():
         if "feature_denoiser" in name or "decoder" in name:
             param.requires_grad = True
         else:
@@ -230,12 +235,12 @@ def train_one_epoch_denoiser(
             noise_mean_reg = torch.tensor(0.0, device=input.device)
 
         # (4) Self-consistency: D(feature + pred_noise) ≈ feature
-        restored_twice = net.feature_denoiser(feature + pred_noise)
+        restored_twice = model.feature_denoiser(feature + pred_noise)
         self_loss = masked_mse_loss(restored_twice, feature, mask)
 
         # (5) emphasize decoder's reconstruction quality
-        no_noise_recon_image = net.decoder(feature, 60, net.model)
-        no_noise_recon_loss = net.distortion_loss.forward(
+        no_noise_recon_image = model.decoder(feature, 60, model.model)
+        no_noise_recon_loss = model.distortion_loss.forward(
             input, no_noise_recon_image.clamp(0.0, 1.0)
         )
 

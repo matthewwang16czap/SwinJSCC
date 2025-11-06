@@ -135,7 +135,12 @@ if __name__ == "__main__":
 
     ### DDP CHANGE — wrap model
     if ddp_env["world_size"] > 1:
-        net = DDP(net, device_ids=[config.device_id], output_device=config.device_id)
+        net = DDP(
+            net,
+            device_ids=[config.device_id],
+            output_device=config.device_id,
+            find_unused_parameters=True,
+        )
 
     # --- Data ---
     train_loader, test_loader, train_sampler = get_loader(
