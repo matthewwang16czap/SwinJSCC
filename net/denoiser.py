@@ -36,6 +36,9 @@ class DownBlock(nn.Module):
         )
 
     def forward(self, x):
+        # Pad to even length to avoid size mismatches
+        if x.size(-1) % 2 != 0:
+            x = F.pad(x, (0, 1))
         return self.block(x)
 
 
@@ -71,7 +74,7 @@ class UNet1D(nn.Module):
         num_groups=8,
         depth=3,
         factor=2,
-        use_sigmoid=True,
+        use_sigmoid=False,
     ):
         super().__init__()
         assert depth >= 1, "depth must be >= 1"
@@ -103,6 +106,10 @@ class UNet1D(nn.Module):
 
         # Output
         self.outc = nn.Conv1d(hidden, channels, 3, padding=1)
+        nn.init.zeros_(self.outc.weight)
+        nn.init.zeros_(self.outc.bias)
+
+        # if predict clean feature directly
         if use_sigmoid:
             self.activation = nn.Sigmoid()
 
