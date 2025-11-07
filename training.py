@@ -218,7 +218,9 @@ def train_one_epoch_denoiser(
 
         # ---------------------- Loss Components ---------------------- #
         # (1) Orthogonal loss: encourage pred_noise ⟂ restored_feature
-        orth_loss = masked_orthogonal_loss(restored_feature, feature, mask)
+        orth_loss = masked_orthogonal_loss(
+            restored_feature, noise, pred_noise, mask, alpha=0.8
+        )
 
         # (2) MSE between restored_feature and ground-truth feature
         mse_loss = masked_mse_loss(restored_feature, feature, mask)
@@ -247,12 +249,16 @@ def train_one_epoch_denoiser(
         # ---------------------- Combine ---------------------- #
         a_1, a_2, a_3, a_4, a_5, a_6 = config.alpha_losses  # tuple of 6 weights
         total_loss = (
-            a_1 * orth_loss
-            + a_2 * mse_loss
-            + a_3 * noise_mean_reg
-            + a_4 * self_loss
-            + a_5 * no_noise_recon_loss
-            + a_6 * loss_G
+            (a_1 * orth_loss + a_2 * mse_loss + a_3 * noise_mean_reg + a_4 * self_loss)
+            if args.stage == 1
+            else (
+                a_1 * orth_loss
+                + a_2 * mse_loss
+                + a_3 * noise_mean_reg
+                + a_4 * self_loss
+                + a_5 * no_noise_recon_loss
+                + a_6 * loss_G
+            )
         )
 
         # print(total_loss)

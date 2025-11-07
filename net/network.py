@@ -5,9 +5,7 @@ from net.channel import Channel
 from random import choice
 import torch
 import torch.nn as nn
-import torch.distributed as dist
 from net.denoiser import UNet1D
-from loss.denoise import denoise_loss_fn
 
 
 class SwinJSCC(nn.Module):
@@ -25,7 +23,6 @@ class SwinJSCC(nn.Module):
             config.logger.info("Decoder: ")
             config.logger.info(decoder_kwargs)
         self.distortion_loss = Distortion(args)
-        self.denoise_loss = denoise_loss_fn
         self.channel = Channel(args, config)
         self.pass_channel = config.pass_channel
         self.squared_difference = torch.nn.MSELoss(reduction="none")
@@ -113,16 +110,6 @@ class SwinJSCC(nn.Module):
             input_image * 255.0, recon_image.clamp(0.0, 1.0) * 255.0
         )
         loss_G = self.distortion_loss.forward(input_image, recon_image.clamp(0.0, 1.0))
-
-        # # for training denoiser only
-        # denoise_loss, _, _ = self.denoise_loss(
-        #     restored_feature, feature, mask, alpha=0, beta=1.0
-        # )
-
-        # if self.config.denoise_training:
-        #     return recon_image, CBR, chan_param, mse.mean(), denoise_loss
-        # else:
-        #     return recon_image, CBR, chan_param, mse.mean(), loss_G.mean()
 
         return (
             recon_image,

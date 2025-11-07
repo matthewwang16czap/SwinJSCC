@@ -19,8 +19,8 @@ class Config:
         self.filename = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.workdir = f"./history/{self.filename}"
         # self.homedir = "/home/matthewwang16czap/"
-        self.homedir = "/home/gexin/"
-        # self.homedir = "/public/home/sihanwang/"
+        # self.homedir = "/home/gexin/"
+        self.homedir = "/public/home/sihanwang/"
         self.log = f"{self.workdir}/Log_{self.filename}.log"
         self.samples = f"{self.workdir}/samples"
         self.models = f"{self.workdir}/models"
@@ -33,7 +33,7 @@ class Config:
         self.normalize = False
         self.learning_rate = 1e-4
         # self.alpha_losses = [1e-1, 10, 1e-2, 1, 1e-3, 1e-3]
-        self.alpha_losses = [1, 1, 1, 1, 1, 1e-2]
+        self.alpha_losses = [10, 2, 0.2, 0.5, 1, 0.05]
         self.tot_epoch = 10_000_000
 
         # --- Model toggles ---

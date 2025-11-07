@@ -41,6 +41,9 @@ if __name__ == "__main__":
         "--denoise-training", action="store_true", help="train the denoiser"
     )
     parser.add_argument(
+        "--stage", type=int, default=1, choices=[1, 2], help="denoise training stage"
+    )
+    parser.add_argument(
         "--trainset",
         type=str,
         default="DIV2K",
@@ -128,8 +131,8 @@ if __name__ == "__main__":
 
     # --- Model ---
     net = SwinJSCC(args, config).to(config.device)
-    # model_path = "./checkpoints/SwinJSCC_w_SAandRA_AWGN_HRimage_cbr_psnr_snr.model"
-    model_path = "./checkpoints/fix_snr_fix_cbr_model.model"
+    model_path = "./checkpoints/pretrained.model"
+    # model_path = "./checkpoints/fix_snr_fix_cbr_model.model"
     # model_path = "history/2025-09-28 18:57:35/models/2025-09-28 18:57:35_EP50.model"
     load_weights(net, model_path)
 
@@ -203,7 +206,7 @@ if __name__ == "__main__":
                     config,
                 )
 
-            # ✅ Save/check only on rank 0
+            # Save/check only on rank 0
             if (epoch + 1) % config.save_model_freq == 0 and ddp_env["rank"] == 0:
                 save_model(
                     net.module if isinstance(net, DDP) else net,
