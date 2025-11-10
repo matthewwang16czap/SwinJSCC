@@ -109,10 +109,10 @@ def test(net, test_loader, CalcuSSIM, logger, args, config):
                     # Handle different data formats
                     input = data[0]
                     input = input.to(config.device, non_blocking=True)
-
                     (
                         recon_image,
                         restored_feature,
+                        pred_noise,
                         noisy_feature,
                         feature,
                         mask,
