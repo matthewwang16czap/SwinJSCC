@@ -4,6 +4,7 @@ from loss.distortion import *
 from loss.denoise import *
 import time
 from random import choice
+from torch.utils.checkpoint import checkpoint
 
 
 def train_one_epoch(
@@ -254,16 +255,8 @@ def train_one_epoch_denoiser(
             )
         )
 
-        # (5) emphasize decoder's reconstruction quality
-        # no_noise_recon_image = model.decoder(feature.detach(), 60, model.model)
-        # no_noise_recon_loss = model.distortion_loss.forward(
-        #     input, no_noise_recon_image.clamp(0.0, 1.0)
-        # )
-        no_noise_recon_image = torch.zeros_like(input, device=input.device)
-        no_noise_recon_loss = torch.tensor(0.0, device=input.device)
-
         # ---------------------- Combine ---------------------- #
-        a_1, a_2, a_3, a_4, a_5, a_6 = config.alpha_losses  # tuple of 6 weights
+        a_1, a_2, a_3, a_4, a_5 = config.alpha_losses  # tuple of 6 weights
         total_loss = (
             (a_1 * orth_loss + a_2 * mse_loss + a_3 * noise_mean_reg + a_4 * self_loss)
             if args.stage == 1
@@ -272,15 +265,12 @@ def train_one_epoch_denoiser(
                 + a_2 * mse_loss
                 + a_3 * noise_mean_reg
                 + a_4 * self_loss
-                + a_5 * no_noise_recon_loss
-                + a_6 * loss_G
+                + a_5 * loss_G
             )
         )
 
-        # print(total_loss)
-
         optimizer.zero_grad()
-        total_loss.backward()
+        total_loss.backward(retain_graph=True)
         optimizer.step()
 
         # ---------------------- Metric computation ---------------------- #
@@ -299,17 +289,6 @@ def train_one_epoch_denoiser(
             )
             metrics["msssim_recon"].update(msssim_recon)
 
-        # --- PSNR and MSSSIM for no_noise_recon_image ---
-        mse_no_noise = torch.mean((input - no_noise_recon_image) ** 2)
-        if mse_no_noise.item() > 0:
-            psnr_no_noise = 10 * (torch.log(255.0 * 255.0 / mse_no_noise) / np.log(10))
-            metrics["psnr_no_noise"].update(psnr_no_noise.item())
-
-            msssim_no_noise = (
-                1 - CalcuSSIM(input, no_noise_recon_image.clamp(0.0, 1.0)).mean().item()
-            )
-            metrics["msssim_no_noise"].update(msssim_no_noise)
-
         # ---------------------- Logging ---------------------- #
         if global_step % config.print_step == 0:
             logger.info(
@@ -319,21 +298,14 @@ def train_one_epoch_denoiser(
                 f"SNR {metrics['snrs'].val:.2f} ({metrics['snrs'].avg:.2f}) | "
                 f"PSNR(recon) {metrics['psnr_recon'].val:.3f} ({metrics['psnr_recon'].avg:.3f}) | "
                 f"MSSSIM(recon) {metrics['msssim_recon'].val:.3f} ({metrics['msssim_recon'].avg:.3f}) | "
-                f"PSNR(no-noise) {metrics['psnr_no_noise'].val:.3f} ({metrics['psnr_no_noise'].avg:.3f}) | "
-                f"MSSSIM(no-noise) {metrics['msssim_no_noise'].val:.3f} ({metrics['msssim_no_noise'].avg:.3f}) | "
                 f"Orth {orth_loss.item():.4f} | MSE {mse_loss.item():.4f} | "
                 f"MeanReg {noise_mean_reg.item():.6f} | Self {self_loss.item():.4f} | "
-                f"NoNoiseRecon {no_noise_recon_loss.item():.4f} | Recon {loss_G.item():.4f}"
+                f"Recon {loss_G.item():.4f}"
             )
 
             # Reset metrics after each print interval
             for m in metrics.values():
                 m.clear()
-
-        # ============================================================
-        # CRITICAL: Release memory before next iteration
-        # ============================================================
-        del restored_twice, pred_noise_twice, no_noise_recon_image
 
         # Optional but recommended: clear cache every few steps
         if batch_idx % 10 == 0:

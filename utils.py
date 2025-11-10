@@ -85,6 +85,22 @@ def load_weights(net, model_path):
     del pretrained
 
 
+def move_to_cpu(*tensors):
+    for t in tensors:
+        try:
+            if torch.is_tensor(t):
+                t.data = t.cpu()
+        except Exception:
+            pass
+
+
+def mem_report(tag):
+    torch.cuda.synchronize()
+    print(
+        f"{tag} allocated: {torch.cuda.memory_allocated()/1e6:.1f}MB, reserved: {torch.cuda.memory_reserved()/1e6:.1f}MB"
+    )
+
+
 def seed_torch(seed=1029):
     random.seed(seed)
     os.environ["PYTHONHASHSEED"] = str(seed)  # 为了禁止hash随机化，使得实验可复现
