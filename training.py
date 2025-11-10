@@ -26,6 +26,7 @@ def train_one_epoch(
         (
             recon_image,
             restored_feature,
+            pred_noise,
             noisy_feature,
             feature,
             mask,
@@ -202,6 +203,7 @@ def train_one_epoch_denoiser(
         (
             recon_image,
             restored_feature,
+            pred_noise,
             noisy_feature,
             feature,
             mask,
@@ -214,7 +216,6 @@ def train_one_epoch_denoiser(
         noisy_feature = noisy_feature.detach()
         mask = mask.detach()
         noise = noisy_feature - feature
-        pred_noise = noisy_feature - restored_feature
 
         # ---------------------- Loss Components ---------------------- #
         # (1) Orthogonal loss: encourage pred_noise ⟂ restored_feature
@@ -223,7 +224,11 @@ def train_one_epoch_denoiser(
         )
 
         # (2) MSE between restored_feature and ground-truth feature
-        mse_loss = masked_mse_loss(restored_feature, feature, mask)
+        mse_loss = (
+            masked_mse_loss(restored_feature, feature, mask)
+            + masked_mse_loss(pred_noise, noise, mask)
+            + 0.8 * masked_mse_loss(pred_noise + restored_feature, noisy_feature, mask)
+        )
 
         # (3) Noise mean regularization (only for AWGN)
         if args.channel_type == "awgn":
@@ -237,14 +242,25 @@ def train_one_epoch_denoiser(
             noise_mean_reg = torch.tensor(0.0, device=input.device)
 
         # (4) Self-consistency: D(feature + pred_noise) ≈ feature
-        restored_twice = model.feature_denoiser(feature + pred_noise)
-        self_loss = masked_mse_loss(restored_twice, feature, mask)
+        restored_twice, pred_noise_twice = model.feature_denoiser(
+            (feature + pred_noise).detach(), mask
+        )
+        self_loss = (
+            masked_mse_loss(restored_twice, feature, mask)
+            + masked_mse_loss(pred_noise_twice, pred_noise_twice, mask)
+            + 0.8
+            * masked_mse_loss(
+                pred_noise_twice + restored_twice, pred_noise + feature, mask
+            )
+        )
 
         # (5) emphasize decoder's reconstruction quality
-        no_noise_recon_image = model.decoder(feature, 60, model.model)
-        no_noise_recon_loss = model.distortion_loss.forward(
-            input, no_noise_recon_image.clamp(0.0, 1.0)
-        )
+        # no_noise_recon_image = model.decoder(feature.detach(), 60, model.model)
+        # no_noise_recon_loss = model.distortion_loss.forward(
+        #     input, no_noise_recon_image.clamp(0.0, 1.0)
+        # )
+        no_noise_recon_image = torch.zeros_like(input, device=input.device)
+        no_noise_recon_loss = torch.tensor(0.0, device=input.device)
 
         # ---------------------- Combine ---------------------- #
         a_1, a_2, a_3, a_4, a_5, a_6 = config.alpha_losses  # tuple of 6 weights
@@ -313,5 +329,14 @@ def train_one_epoch_denoiser(
             # Reset metrics after each print interval
             for m in metrics.values():
                 m.clear()
+
+        # ============================================================
+        # CRITICAL: Release memory before next iteration
+        # ============================================================
+        del restored_twice, pred_noise_twice, no_noise_recon_image
+
+        # Optional but recommended: clear cache every few steps
+        if batch_idx % 10 == 0:
+            torch.cuda.empty_cache()
 
     return global_step

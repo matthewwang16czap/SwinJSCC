@@ -5,7 +5,7 @@ from net.channel import Channel
 from random import choice
 import torch
 import torch.nn as nn
-from net.unet1dp import UNet1D
+from net.denoiser import UNet1D
 
 
 class SwinJSCC(nn.Module):
@@ -40,8 +40,8 @@ class SwinJSCC(nn.Module):
             UNet1D(
                 channels=encoder_kwargs["embed_dims"][-1],
                 hidden=encoder_kwargs["embed_dims"][-1],
+                depth=3,
                 factor=1,
-                depth=8,
             )
             if args.denoise
             else None
@@ -101,12 +101,9 @@ class SwinJSCC(nn.Module):
 
         # --- Pass noisy feature through feature_denoiser network ---
         if self.feature_denoiser:
-            pred_noise = self.feature_denoiser(noisy_feature)  # predict noise
-            restored_feature = (
-                noisy_feature - pred_noise
-            )  # subtract to get denoised feature
-            # ensure values are in [0, 1]
-            restored_feature = restored_feature.clamp(0.0, 1.0)
+            restored_feature, pred_noise = self.feature_denoiser(
+                noisy_feature, mask
+            )  # predict noise
         else:
             pred_noise = torch.zeros_like(noisy_feature)
             restored_feature = noisy_feature
@@ -120,6 +117,7 @@ class SwinJSCC(nn.Module):
         return (
             recon_image,
             restored_feature,
+            pred_noise,
             noisy_feature,
             feature,
             mask,

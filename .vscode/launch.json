@@ -1,16 +1,18 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger: Train SwinJSCC",
+            "name": "Debug SwinJSCC (torchrun, single GPU)",
             "type": "debugpy",
             "request": "launch",
-            "program": "main.py",          // entry script
-            "console": "integratedTerminal",
+
+            // Instead of calling the script directly, we run the torch.distributed launcher
+            "module": "torch.distributed.run",
+
+            // torchrun arguments first, then your script and its args
             "args": [
+                "--nproc_per_node=1",
+                "train_ddp.py",
                 "--trainset", "DIV2K",
                 "--testset", "kodak",
                 "--distortion-metric", "MSE",
@@ -19,10 +21,21 @@
                 "--C", "32,64,96,128,192",
                 "--multiple-snr", "1,4,7,10,13",
                 "--model_size", "base",
+                // "--training",
+                "--stage", "1",
                 "--denoise",
-                "--training",
                 "--denoise-training"
-            ]
+            ],
+
+            // Ensure the process sees the GPU
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "0"
+            },
+
+            "console": "integratedTerminal",
+
+            // Optional: ensures you can use breakpoints reliably
+            "justMyCode": false
         }
     ]
 }

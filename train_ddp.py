@@ -131,7 +131,7 @@ if __name__ == "__main__":
 
     # --- Model ---
     net = SwinJSCC(args, config).to(config.device)
-    model_path = "./checkpoints/pretrained.model"
+    model_path = "./checkpoints/pretrained_EP12500.model"
     # model_path = "./checkpoints/fix_snr_fix_cbr_model.model"
     # model_path = "history/2025-09-28 18:57:35/models/2025-09-28 18:57:35_EP50.model"
     load_weights(net, model_path)
