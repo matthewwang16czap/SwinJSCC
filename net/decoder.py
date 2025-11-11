@@ -177,7 +177,7 @@ class SwinJSCC_Decoder(nn.Module):
             B, L, C = x.size()
             device = x.device
             x = self.head_list(x)
-            snr_cuda = torch.tensor(snr, dtype=torch.float).to(device)
+            snr_cuda = snr.clone().detach().to(device)
             snr_batch = snr_cuda.unsqueeze(0).expand(B, -1)
             for i in range(self.layer_num):
                 if i == 0:
@@ -204,7 +204,7 @@ class SwinJSCC_Decoder(nn.Module):
         elif model == "SwinJSCC_w/_SAandRA":
             B, L, C = x.size()
             device = x.device
-            snr_cuda = torch.tensor(snr, dtype=torch.float).to(device)
+            snr_cuda = snr.clone().detach().to(device)
             snr_batch = snr_cuda.unsqueeze(0).expand(B, -1)
             for i in range(self.layer_num):
                 if i == 0:

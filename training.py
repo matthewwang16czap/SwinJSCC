@@ -3,8 +3,6 @@ import torch
 from loss.distortion import *
 from loss.denoise import *
 import time
-from random import choice
-from torch.utils.checkpoint import checkpoint
 
 
 def train_one_epoch(
@@ -33,6 +31,8 @@ def train_one_epoch(
             mask,
             CBR,
             SNR,
+            real_snr,
+            chan_param,
             mse,
             loss_G,
         ) = net(input)
@@ -119,6 +119,8 @@ def test(net, test_loader, CalcuSSIM, logger, args, config):
                         mask,
                         CBR,
                         SNR,
+                        real_snr,
+                        chan_param,
                         mse,
                         loss_G,
                     ) = net(input, SNR, rate)
@@ -178,6 +180,8 @@ def train_one_epoch_denoiser(
         "losses",
         "cbrs",
         "snrs",
+        "real_snr",
+        "chan_param",
         "psnr_recon",
         "msssim_recon",
         "psnr_no_noise",
@@ -187,7 +191,9 @@ def train_one_epoch_denoiser(
 
     # --- Freeze encoder/channel ---
     for name, param in model.named_parameters():
-        if "feature_denoiser" in name or "decoder" in name:
+        if args.stage == 1 and "feature_denoiser" in name:
+            param.requires_grad = True
+        elif args.stage == 2 and "decoder" in name:
             param.requires_grad = True
         else:
             param.requires_grad = False
@@ -210,6 +216,8 @@ def train_one_epoch_denoiser(
             mask,
             CBR,
             SNR,
+            real_snr,
+            chan_param,
             mse,
             loss_G,
         ) = net(input)
@@ -244,7 +252,7 @@ def train_one_epoch_denoiser(
 
         # (4) Self-consistency: D(feature + pred_noise) ≈ feature
         restored_twice, pred_noise_twice = model.feature_denoiser(
-            (feature + pred_noise).detach(), mask
+            (feature + pred_noise).detach(), mask, real_snr
         )
         self_loss = (
             masked_mse_loss(restored_twice, feature, mask)
@@ -260,13 +268,7 @@ def train_one_epoch_denoiser(
         total_loss = (
             (a_1 * orth_loss + a_2 * mse_loss + a_3 * noise_mean_reg + a_4 * self_loss)
             if args.stage == 1
-            else (
-                a_1 * orth_loss
-                + a_2 * mse_loss
-                + a_3 * noise_mean_reg
-                + a_4 * self_loss
-                + a_5 * loss_G
-            )
+            else a_5 * loss_G
         )
 
         optimizer.zero_grad()
@@ -278,6 +280,8 @@ def train_one_epoch_denoiser(
         metrics["losses"].update(total_loss.item())
         metrics["cbrs"].update(CBR)
         metrics["snrs"].update(SNR)
+        metrics["real_snr"].update(real_snr)
+        metrics["chan_param"].update(chan_param)
 
         # --- PSNR and MSSSIM for recon_image ---
         if mse.item() > 0:
@@ -296,6 +300,8 @@ def train_one_epoch_denoiser(
                 f"Loss {metrics['losses'].val:.4f} ({metrics['losses'].avg:.4f}) | "
                 f"CBR {metrics['cbrs'].val:.4f} ({metrics['cbrs'].avg:.4f}) | "
                 f"SNR {metrics['snrs'].val:.2f} ({metrics['snrs'].avg:.2f}) | "
+                f"SNR(real) {metrics['real_snr'].val:.2f} ({metrics['real_snr'].avg:.2f}) | "
+                f"SNR(denoised) {metrics['chan_param'].val:.2f} ({metrics['chan_param'].avg:.2f}) | "
                 f"PSNR(recon) {metrics['psnr_recon'].val:.3f} ({metrics['psnr_recon'].avg:.3f}) | "
                 f"MSSSIM(recon) {metrics['msssim_recon'].val:.3f} ({metrics['msssim_recon'].avg:.3f}) | "
                 f"Orth {orth_loss.item():.4f} | MSE {mse_loss.item():.4f} | "

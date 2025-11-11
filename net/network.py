@@ -1,11 +1,12 @@
 from net.decoder import *
 from net.encoder import *
 from loss.distortion import Distortion
+from loss.denoise import masked_mse_loss
 from net.channel import Channel
 from random import choice
 import torch
 import torch.nn as nn
-from net.denoiser import UNet1D
+from net.unet1d import UNet1D
 
 
 class SwinJSCC(nn.Module):
@@ -72,6 +73,7 @@ class SwinJSCC(nn.Module):
             SNR = choice(self.multiple_snr)
             chan_param = SNR
         else:
+            SNR = given_SNR
             chan_param = given_SNR
 
         if given_rate is None:
@@ -99,11 +101,19 @@ class SwinJSCC(nn.Module):
                 noisy_feature = feature
             noisy_feature = noisy_feature * mask
 
+        # get real snr
+        noise_mse = masked_mse_loss(noisy_feature, feature, mask).detach()
+        signal_power = (((feature * mask) ** 2).sum() / mask.sum()).detach()
+        real_snr = 10 * torch.log10(signal_power / (noise_mse + 1e-8))
+
         # --- Pass noisy feature through feature_denoiser network ---
         if self.feature_denoiser:
             restored_feature, pred_noise = self.feature_denoiser(
-                noisy_feature, mask
+                noisy_feature, mask, real_snr
             )  # predict noise
+            # repredict chan_param
+            restore_mse = masked_mse_loss(restored_feature, feature, mask).detach()
+            chan_param = 10 * torch.log10(signal_power / (restore_mse + 1e-8))
         else:
             pred_noise = torch.zeros_like(noisy_feature)
             restored_feature = noisy_feature
@@ -122,6 +132,8 @@ class SwinJSCC(nn.Module):
             feature,
             mask,
             CBR,
+            SNR,
+            real_snr,
             chan_param,
             mse.mean(),
             loss_G.mean(),
