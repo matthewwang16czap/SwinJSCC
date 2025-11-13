@@ -43,6 +43,7 @@ class SwinJSCC(nn.Module):
                 hidden=encoder_kwargs["embed_dims"][-1],
                 depth=3,
                 factor=1,
+                use_sigmoid=False,
             )
             if args.denoise
             else None
@@ -117,6 +118,10 @@ class SwinJSCC(nn.Module):
         else:
             pred_noise = torch.zeros_like(noisy_feature)
             restored_feature = noisy_feature
+
+        # test
+        # cos_sim_before = F.cosine_similarity(feature, noisy_feature, dim=-1).mean()
+        # cos_sim_after = F.cosine_similarity(feature, restored_feature, dim=-1).mean()
 
         recon_image = self.decoder(restored_feature, chan_param, self.model)
         mse = self.squared_difference(

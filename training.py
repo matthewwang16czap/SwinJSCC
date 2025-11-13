@@ -191,12 +191,19 @@ def train_one_epoch_denoiser(
 
     # --- Freeze encoder/channel ---
     for name, param in model.named_parameters():
-        if args.stage == 1 and "feature_denoiser" in name:
-            param.requires_grad = True
-        elif args.stage == 2 and "decoder" in name:
-            param.requires_grad = True
-        else:
-            param.requires_grad = False
+        param.requires_grad = False
+
+    if args.stage == 1:
+        for name, param in model.named_parameters():
+            if "feature_denoiser" in name:
+                param.requires_grad = True
+    elif args.stage == 2:
+        # for name, param in model.decoder.named_parameters():
+        #     if "bm_list" in name or "sm_list" in name or "head_list" in name:
+        #         param.requires_grad = True
+        for name, param in model.named_parameters():
+            if "decoder" in name:
+                param.requires_grad = True
 
     for batch_idx, data in enumerate(train_loader):
         start_time = time.time()
@@ -268,7 +275,7 @@ def train_one_epoch_denoiser(
         total_loss = (
             (a_1 * orth_loss + a_2 * mse_loss + a_3 * noise_mean_reg + a_4 * self_loss)
             if args.stage == 1
-            else a_5 * loss_G
+            else loss_G
         )
 
         optimizer.zero_grad()

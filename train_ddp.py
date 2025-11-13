@@ -134,6 +134,7 @@ if __name__ == "__main__":
     model_path = "./checkpoints/pretrained_EP12500.model"
     # model_path = "./checkpoints/fix_snr_fix_cbr_model.model"
     # model_path = "./checkpoints/denoised_EP2700.model"
+    # model_path = "./checkpoints/full.model"
     load_weights(net, model_path)
 
     ### DDP CHANGE — wrap model

@@ -144,17 +144,19 @@ class UNet1D(nn.Module):
         x = self.final_conv(x)
 
         # Output: (B, 2C, N)
-        x = self.outc(x)
-        if self.use_sigmoid:
-            x = self.activation(x)
-
-        # Split into clean/noise and permute back
+        x = self.outc(x)  # (B, 2C, N)
         clean, noise = x.chunk(2, dim=1)  # (B, C, N) each
+
+        if self.use_sigmoid:
+            clean = torch.sigmoid(clean)  # only clean is squashed to (0,1)
+        # leave `noise` as-is (raw residual)
+
         clean = clean.permute(0, 2, 1)  # (B, N, C)
         noise = noise.permute(0, 2, 1)
 
         if mask is not None:
-            clean = clean * mask  # apply mask back if desired
+            clean = clean * mask
+            noise = noise * mask
 
         return clean, noise
 
