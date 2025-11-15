@@ -189,22 +189,6 @@ def train_one_epoch_denoiser(
     ]
     metrics = {name: AverageMeter() for name in metric_names}
 
-    # --- Freeze encoder/channel ---
-    for name, param in model.named_parameters():
-        param.requires_grad = False
-
-    if args.stage == 1:
-        for name, param in model.named_parameters():
-            if "feature_denoiser" in name:
-                param.requires_grad = True
-    elif args.stage == 2:
-        # for name, param in model.decoder.named_parameters():
-        #     if "bm_list" in name or "sm_list" in name or "head_list" in name:
-        #         param.requires_grad = True
-        for name, param in model.named_parameters():
-            if "decoder" in name:
-                param.requires_grad = True
-
     for batch_idx, data in enumerate(train_loader):
         start_time = time.time()
         global_step += 1
@@ -271,15 +255,13 @@ def train_one_epoch_denoiser(
         )
 
         # ---------------------- Combine ---------------------- #
-        a_1, a_2, a_3, a_4, a_5 = config.alpha_losses  # tuple of 6 weights
+        a_1, a_2, a_3, a_4, a_5 = config.alpha_losses
         total_loss = (
-            (a_1 * orth_loss + a_2 * mse_loss + a_3 * noise_mean_reg + a_4 * self_loss)
-            if args.stage == 1
-            else loss_G
+            a_1 * orth_loss + a_2 * mse_loss + a_3 * noise_mean_reg + a_4 * self_loss
         )
 
         optimizer.zero_grad()
-        total_loss.backward(retain_graph=True)
+        total_loss.backward()
         optimizer.step()
 
         # ---------------------- Metric computation ---------------------- #

@@ -41,7 +41,7 @@ if __name__ == "__main__":
         "--denoise-training", action="store_true", help="train the denoiser"
     )
     parser.add_argument(
-        "--stage", type=int, default=1, choices=[1, 2], help="denoise training stage"
+        "--stage", type=int, default=1, choices=[1, 2, 3], help="denoise training stage"
     )
     parser.add_argument(
         "--trainset",
@@ -131,10 +131,10 @@ if __name__ == "__main__":
 
     # --- Model ---
     net = SwinJSCC(args, config).to(config.device)
-    model_path = "./checkpoints/pretrained_EP12500.model"
+    # model_path = "./checkpoints/pretrained_EP12500.model"
     # model_path = "./checkpoints/fix_snr_fix_cbr_model.model"
     # model_path = "./checkpoints/denoised_EP2700.model"
-    # model_path = "./checkpoints/full.model"
+    model_path = "./checkpoints/full.model"
     load_weights(net, model_path)
 
     ### DDP CHANGE — wrap model
@@ -145,6 +145,10 @@ if __name__ == "__main__":
             output_device=config.device_id,
             find_unused_parameters=True,
         )
+
+    # Check if model is wrapped in DDP
+    is_ddp = hasattr(net, "module")
+    model = net.module if is_ddp else net
 
     # --- Data ---
     train_loader, test_loader, train_sampler = get_loader(
@@ -195,17 +199,50 @@ if __name__ == "__main__":
                     config,
                 )
             else:
-                global_step = train_one_epoch_denoiser(
-                    epoch,
-                    global_step,
-                    net,
-                    train_loader,
-                    optimizer,
-                    CalcuSSIM,
-                    logger,
-                    args,
-                    config,
-                )
+                # --- Freeze params ---
+                for name, param in model.named_parameters():
+                    param.requires_grad = False
+
+                if args.stage == 1:
+                    for name, param in model.named_parameters():
+                        if "feature_denoiser" in name:
+                            param.requires_grad = True
+                elif args.stage == 2:
+                    # for name, param in model.decoder.named_parameters():
+                    #     if "bm_list" in name or "sm_list" in name or "head_list" in name:
+                    #         param.requires_grad = True
+                    for name, param in model.named_parameters():
+                        if "decoder" in name:
+                            param.requires_grad = True
+                elif args.stage == 3:
+                    for name, param in model.named_parameters():
+                        if "encoder" in name or "decoder" in name:
+                            param.requires_grad = True
+
+                if args.stage == 1:
+                    global_step = train_one_epoch_denoiser(
+                        epoch,
+                        global_step,
+                        net,
+                        train_loader,
+                        optimizer,
+                        CalcuSSIM,
+                        logger,
+                        args,
+                        config,
+                    )
+                else:
+                    global_step = train_one_epoch(
+                        epoch,
+                        global_step,
+                        net,
+                        train_loader,
+                        optimizer,
+                        CalcuSSIM,
+                        logger,
+                        args,
+                        config,
+                    )
 
             # Save/check only on rank 0
             if (epoch + 1) % config.save_model_freq == 0 and ddp_env["rank"] == 0:

@@ -70,7 +70,7 @@ class UNet1D(nn.Module):
     def __init__(
         self,
         channels=320,
-        hidden=320,
+        hidden=64,
         num_groups=8,
         depth=3,
         factor=2,
@@ -163,7 +163,7 @@ class UNet1D(nn.Module):
 
 if __name__ == "__main__":
     # Instantiate model
-    model = UNet1D(channels=320, hidden=64, depth=3)
+    model = UNet1D(channels=320, hidden=64, depth=3, factor=2)
     print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
 
     # Test input dimensions
