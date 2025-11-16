@@ -540,3 +540,15 @@ class SwinTransformerBlock(nn.Module):
         # norm2
         flops += self.dim * H * W
         return flops
+
+
+class ResidualAdapter(nn.Module):
+    def __init__(self, dim, bottleneck=128):
+        super().__init__()
+        self.down = nn.Linear(dim, bottleneck)
+        self.act = nn.GELU()
+        self.up = nn.Linear(bottleneck, dim)
+
+    def forward(self, x):
+        # x: [B, N, C]
+        return x + self.up(self.act(self.down(x)))

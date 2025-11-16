@@ -131,10 +131,10 @@ if __name__ == "__main__":
 
     # --- Model ---
     net = SwinJSCC(args, config).to(config.device)
-    # model_path = "./checkpoints/pretrained_EP12500.model"
+    model_path = "./checkpoints/pretrained_EP12500.model"
     # model_path = "./checkpoints/fix_snr_fix_cbr_model.model"
     # model_path = "./checkpoints/denoised_EP2700.model"
-    model_path = "./checkpoints/full.model"
+    # model_path = "./checkpoints/full.model"
     load_weights(net, model_path)
 
     ### DDP CHANGE — wrap model
@@ -205,7 +205,7 @@ if __name__ == "__main__":
 
                 if args.stage == 1:
                     for name, param in model.named_parameters():
-                        if "feature_denoiser" in name:
+                        if "feature_denoiser" in name or "adapter" in name:
                             param.requires_grad = True
                 elif args.stage == 2:
                     # for name, param in model.decoder.named_parameters():

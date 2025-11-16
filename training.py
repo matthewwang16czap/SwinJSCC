@@ -90,7 +90,9 @@ def train_one_epoch(
 def test(net, test_loader, CalcuSSIM, logger, args, config):
     config.isTrain = False
     net.eval()
-    elapsed, psnrs, msssims, snrs, cbrs = [AverageMeter() for _ in range(5)]
+    elapsed, psnrs, msssims, snrs, chan_params, cbrs = [
+        AverageMeter() for _ in range(6)
+    ]
     metrics = [elapsed, psnrs, msssims, snrs, cbrs]
     multiple_snr = args.multiple_snr.split(",")
     for i in range(len(multiple_snr)):
@@ -99,6 +101,7 @@ def test(net, test_loader, CalcuSSIM, logger, args, config):
     for i in range(len(channel_number)):
         channel_number[i] = int(channel_number[i])
     results_snr = np.zeros((len(multiple_snr), len(channel_number)))
+    results_chan_param = np.zeros((len(multiple_snr), len(channel_number)))
     results_cbr = np.zeros((len(multiple_snr), len(channel_number)))
     results_psnr = np.zeros((len(multiple_snr), len(channel_number)))
     results_msssim = np.zeros((len(multiple_snr), len(channel_number)))
@@ -129,6 +132,7 @@ def test(net, test_loader, CalcuSSIM, logger, args, config):
                     elapsed.update(time.time() - start_time)
                     cbrs.update(CBR)
                     snrs.update(SNR)
+                    chan_params.update(chan_param)
                     if mse.item() > 0:
                         psnr = 10 * (torch.log(255.0 * 255.0 / mse) / np.log(10))
                         psnrs.update(psnr.item())
@@ -145,6 +149,7 @@ def test(net, test_loader, CalcuSSIM, logger, args, config):
                             f"Time {elapsed.val:.3f}",
                             f"CBR {cbrs.val:.4f} ({cbrs.avg:.4f})",
                             f"SNR {snrs.val:.1f}",
+                            f"SNR (denoised) {chan_params.val:.1f}",
                             f"PSNR {psnrs.val:.3f} ({psnrs.avg:.3f})",
                             f"MSSSIM {msssims.val:.3f} ({msssims.avg:.3f})",
                             f"Lr {config.learning_rate}",
@@ -152,6 +157,7 @@ def test(net, test_loader, CalcuSSIM, logger, args, config):
                     )
                     logger.info(log)
             results_snr[i, j] = snrs.avg
+            results_chan_param[i, j] = chan_params.avg
             results_cbr[i, j] = cbrs.avg
             results_psnr[i, j] = psnrs.avg
             results_msssim[i, j] = msssims.avg
@@ -159,6 +165,7 @@ def test(net, test_loader, CalcuSSIM, logger, args, config):
                 t.clear()
 
     logger.info(f"SNR: {results_snr.tolist()}")
+    logger.info(f"SNR (denoised): {(results_chan_param.round(2)).tolist()}")
     logger.info(f"CBR: {results_cbr.tolist()}")
     logger.info(f"PSNR: {results_psnr.tolist()}")
     logger.info(f"MS-SSIM: {results_msssim.tolist()}")
@@ -257,7 +264,11 @@ def train_one_epoch_denoiser(
         # ---------------------- Combine ---------------------- #
         a_1, a_2, a_3, a_4, a_5 = config.alpha_losses
         total_loss = (
-            a_1 * orth_loss + a_2 * mse_loss + a_3 * noise_mean_reg + a_4 * self_loss
+            a_1 * orth_loss
+            + a_2 * mse_loss
+            + a_3 * noise_mean_reg
+            + a_4 * self_loss
+            + a_5 * loss_G
         )
 
         optimizer.zero_grad()

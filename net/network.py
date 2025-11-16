@@ -41,12 +41,16 @@ class SwinJSCC(nn.Module):
             UNet1D(
                 channels=encoder_kwargs["embed_dims"][-1],
                 hidden=encoder_kwargs["embed_dims"][-1],
-                depth=3,
+                depth=5,
                 factor=1,
                 use_sigmoid=False,
             )
             if args.denoise
             else None
+        )
+        self.adapter = ResidualAdapter(
+            dim=encoder_kwargs["embed_dims"][-1],
+            bottleneck=encoder_kwargs["embed_dims"][-1],
         )
 
     def distortion_loss_wrapper(self, x_gen, x_real):
@@ -112,6 +116,8 @@ class SwinJSCC(nn.Module):
             restored_feature, pred_noise = self.feature_denoiser(
                 noisy_feature, mask, real_snr
             )  # predict noise
+            # adapt restored feature to decoder
+            restored_feature = self.adapter(restored_feature)
             # repredict chan_param
             restore_mse = masked_mse_loss(restored_feature, feature, mask).detach()
             chan_param = 10 * torch.log10(signal_power / (restore_mse + 1e-8))
