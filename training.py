@@ -90,29 +90,29 @@ def train_one_epoch(
 def test(net, test_loader, CalcuSSIM, logger, args, config):
     config.isTrain = False
     net.eval()
-    elapsed, psnrs, msssims, snrs, chan_params, cbrs = [
-        AverageMeter() for _ in range(6)
-    ]
-    metrics = [elapsed, psnrs, msssims, snrs, cbrs]
-    multiple_snr = args.multiple_snr.split(",")
-    for i in range(len(multiple_snr)):
-        multiple_snr[i] = int(multiple_snr[i])
-    channel_number = args.C.split(",")
-    for i in range(len(channel_number)):
-        channel_number[i] = int(channel_number[i])
+
+    # --- define metrics in a dict ---
+    metric_names = ["elapsed", "psnr", "msssim", "snr", "chan_param", "cbr"]
+    metrics = {name: AverageMeter() for name in metric_names}
+
+    multiple_snr = [int(x) for x in args.multiple_snr.split(",")]
+    channel_number = [int(x) for x in args.C.split(",")]
+
     results_snr = np.zeros((len(multiple_snr), len(channel_number)))
     results_chan_param = np.zeros((len(multiple_snr), len(channel_number)))
     results_cbr = np.zeros((len(multiple_snr), len(channel_number)))
     results_psnr = np.zeros((len(multiple_snr), len(channel_number)))
     results_msssim = np.zeros((len(multiple_snr), len(channel_number)))
+
     for i, SNR in enumerate(multiple_snr):
         for j, rate in enumerate(channel_number):
             with torch.no_grad():
                 for batch_idx, data in enumerate(test_loader):
+
                     start_time = time.time()
-                    # Handle different data formats
-                    input = data[0]
-                    input = input.to(config.device, non_blocking=True)
+
+                    input = data[0].to(config.device, non_blocking=True)
+
                     (
                         recon_image,
                         restored_feature,
@@ -121,48 +121,54 @@ def test(net, test_loader, CalcuSSIM, logger, args, config):
                         feature,
                         mask,
                         CBR,
-                        SNR,
+                        SNR_out,
                         real_snr,
                         chan_param,
                         mse,
                         loss_G,
                     ) = net(input, SNR, rate)
+
                     # torchvision.utils.save_image(recon_image, os.path.join("/home/matthewwang16czap/projects/SwinJSCC/data/", f"recon/{names[0]}"))
 
-                    elapsed.update(time.time() - start_time)
-                    cbrs.update(CBR)
-                    snrs.update(SNR)
-                    chan_params.update(chan_param)
+                    # --- update metrics ---
+                    metrics["elapsed"].update(time.time() - start_time)
+                    metrics["cbr"].update(CBR)
+                    metrics["snr"].update(SNR_out)
+                    metrics["chan_param"].update(chan_param)
+
                     if mse.item() > 0:
                         psnr = 10 * (torch.log(255.0 * 255.0 / mse) / np.log(10))
-                        psnrs.update(psnr.item())
-                        msssim = (
-                            1
-                            - CalcuSSIM(input, recon_image.clamp(0.0, 1.0))
-                            .mean()
-                            .item()
-                        )
-                        msssims.update(msssim)
+                        metrics["psnr"].update(psnr.item())
 
+                        msssim = (
+                            1 - CalcuSSIM(input, recon_image.clamp(0, 1)).mean().item()
+                        )
+                        metrics["msssim"].update(msssim)
+
+                    # --- logging ---
                     log = " | ".join(
                         [
-                            f"Time {elapsed.val:.3f}",
-                            f"CBR {cbrs.val:.4f} ({cbrs.avg:.4f})",
-                            f"SNR {snrs.val:.1f}",
-                            f"SNR (denoised) {chan_params.val:.1f}",
-                            f"PSNR {psnrs.val:.3f} ({psnrs.avg:.3f})",
-                            f"MSSSIM {msssims.val:.3f} ({msssims.avg:.3f})",
+                            f"Time {metrics['elapsed'].val:.3f}",
+                            f"CBR {metrics['cbr'].val:.4f} ({metrics['cbr'].avg:.4f})",
+                            f"SNR {metrics['snr'].val:.1f}",
+                            f"SNR (denoised) {metrics['chan_param'].val:.2f} ({metrics['chan_param'].avg:.2f})",
+                            f"PSNR {metrics['psnr'].val:.3f} ({metrics['psnr'].avg:.3f})",
+                            f"MSSSIM {metrics['msssim'].val:.3f} ({metrics['msssim'].avg:.3f})",
                             f"Lr {config.learning_rate}",
                         ]
                     )
                     logger.info(log)
-            results_snr[i, j] = snrs.avg
-            results_chan_param[i, j] = chan_params.avg
-            results_cbr[i, j] = cbrs.avg
-            results_psnr[i, j] = psnrs.avg
-            results_msssim[i, j] = msssims.avg
-            for t in metrics:
-                t.clear()
+
+            # --- store results ---
+            results_snr[i, j] = metrics["snr"].avg
+            results_chan_param[i, j] = metrics["chan_param"].avg
+            results_cbr[i, j] = metrics["cbr"].avg
+            results_psnr[i, j] = metrics["psnr"].avg
+            results_msssim[i, j] = metrics["msssim"].avg
+
+            # --- clear all metric meters ---
+            for m in metrics.values():
+                m.clear()
 
     logger.info(f"SNR: {results_snr.tolist()}")
     logger.info(f"SNR (denoised): {(results_chan_param.round(2)).tolist()}")
