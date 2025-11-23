@@ -22,8 +22,8 @@
                 "--multiple-snr", "1,4,7,10,13",
                 "--model_size", "base",
                 // "--training",
-                // "--denoise-training",
-                // "--stage", "1",
+                "--denoise-training",
+                "--stage", "3",
                 "--denoise",
                 
             ],

@@ -552,3 +552,39 @@ class ResidualAdapter(nn.Module):
     def forward(self, x):
         # x: [B, N, C]
         return x + self.up(self.act(self.down(x)))
+
+
+class MultiLayerAdapter(nn.Module):
+    def __init__(self, dim, bottleneck=320, depth=3):
+        super().__init__()
+
+        self.first = nn.Sequential(
+            nn.LayerNorm(dim * 2),
+            nn.Linear(dim * 2, bottleneck),
+            nn.GELU(),
+            nn.Linear(bottleneck, dim),
+        )
+
+        self.blocks = nn.ModuleList(
+            [
+                nn.Sequential(
+                    nn.LayerNorm(dim),
+                    nn.Linear(dim, bottleneck),
+                    nn.GELU(),
+                    nn.Linear(bottleneck, dim),
+                )
+                for _ in range(depth - 1)
+            ]
+        )
+
+    def forward(self, restored, noisy):
+        x = restored
+
+        # Block 0: concat
+        x = x + self.first(torch.cat([x, noisy], dim=-1))
+
+        # Blocks 1..depth: no concat
+        for blk in self.blocks:
+            x = x + blk(x)
+
+        return x

@@ -237,45 +237,21 @@ def train_one_epoch_denoiser(
         )
 
         # (2) MSE between restored_feature and ground-truth feature
-        mse_loss = (
-            masked_mse_loss(restored_feature, feature, mask)
-            + masked_mse_loss(pred_noise, noise, mask)
-            + 0.8 * masked_mse_loss(pred_noise + restored_feature, noisy_feature, mask)
+        mse_loss = masked_mse_loss(restored_feature, feature, mask) + masked_mse_loss(
+            pred_noise, noise, mask
         )
 
-        # (3) Noise mean regularization (only for AWGN)
-        if args.channel_type == "awgn":
-            noise_mean_real = (
-                pred_noise.real.mean()
-                if torch.is_complex(pred_noise)
-                else pred_noise.mean()
-            )
-            noise_mean_reg = noise_mean_real**2
-        else:
-            noise_mean_reg = torch.tensor(0.0, device=input.device)
-
-        # (4) Self-consistency: D(feature + pred_noise) ≈ feature
+        # (3) Self-consistency: D(feature + pred_noise) ≈ feature
         restored_twice, pred_noise_twice = model.feature_denoiser(
             (feature + pred_noise).detach(), mask, real_snr
         )
-        self_loss = (
-            masked_mse_loss(restored_twice, feature, mask)
-            + masked_mse_loss(pred_noise_twice, pred_noise_twice, mask)
-            + 0.8
-            * masked_mse_loss(
-                pred_noise_twice + restored_twice, pred_noise + feature, mask
-            )
+        self_loss = masked_mse_loss(restored_twice, feature, mask) + masked_mse_loss(
+            pred_noise_twice, pred_noise_twice, mask
         )
 
         # ---------------------- Combine ---------------------- #
-        a_1, a_2, a_3, a_4, a_5 = config.alpha_losses
-        total_loss = (
-            a_1 * orth_loss
-            + a_2 * mse_loss
-            + a_3 * noise_mean_reg
-            + a_4 * self_loss
-            + a_5 * loss_G
-        )
+        a_1, a_2, a_3, a_4 = config.alpha_losses
+        total_loss = a_1 * orth_loss + a_2 * mse_loss + a_3 * self_loss + a_4 * loss_G
 
         optimizer.zero_grad()
         total_loss.backward()

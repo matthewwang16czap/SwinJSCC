@@ -110,7 +110,7 @@ if __name__ == "__main__":
 
     # --- Config and setup ---
     config = Config(args)
-    config.device = ddp_env["device"]  # ✅ Use process-specific device
+    config.device = ddp_env["device"]
     config.device_id = ddp_env["device_id"]
 
     if args.trainset == "CIFAR10":
@@ -133,9 +133,9 @@ if __name__ == "__main__":
     net = SwinJSCC(args, config).to(config.device)
     # model_path = "./checkpoints/pretrained_EP12500.model"
     # model_path = "./checkpoints/fix_snr_fix_cbr_model.model"
-    model_path = "./checkpoints/denoised_EP4600.model"
+    # model_path = "./checkpoints/denoised_EP4600.model"
     # model_path = "./checkpoints/full.model"
-    load_weights(net, model_path)
+    # load_weights(net, model_path)
 
     ### DDP CHANGE — wrap model
     if ddp_env["world_size"] > 1:
@@ -212,12 +212,13 @@ if __name__ == "__main__":
                     #     if "bm_list" in name or "sm_list" in name or "head_list" in name:
                     #         param.requires_grad = True
                     for name, param in model.named_parameters():
-                        if "decoder" in name:
+                        if "adapter" in name or "decoder" in name:
                             param.requires_grad = True
                 elif args.stage == 3:
                     for name, param in model.named_parameters():
-                        if "encoder" in name or "decoder" in name:
-                            param.requires_grad = True
+                        # if "encoder" in name or "decoder" in name:
+                        #     param.requires_grad = True
+                        param.requires_grad = True
 
                 if args.stage == 1:
                     global_step = train_one_epoch_denoiser(
