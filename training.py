@@ -170,11 +170,11 @@ def test(net, test_loader, CalcuSSIM, logger, args, config):
             for m in metrics.values():
                 m.clear()
 
-    logger.info(f"SNR: {results_snr.tolist()}")
-    logger.info(f"SNR (denoised): {(results_chan_param.round(2)).tolist()}")
-    logger.info(f"CBR: {results_cbr.tolist()}")
-    logger.info(f"PSNR: {results_psnr.tolist()}")
-    logger.info(f"MS-SSIM: {results_msssim.tolist()}")
+    logger.info(f"SNR: {results_snr.round(1).tolist()}")
+    logger.info(f"SNR (denoised): {results_chan_param.round(2).tolist()}")
+    logger.info(f"CBR: {results_cbr.round(4).tolist()}")
+    logger.info(f"PSNR: {results_psnr.round(3).tolist()}")
+    logger.info(f"MS-SSIM: {results_msssim.round(3).tolist()}")
     logger.info("Finish Test!")
 
 

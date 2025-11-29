@@ -6,7 +6,7 @@ from net.channel import Channel
 from random import choice
 import torch
 import torch.nn as nn
-from net.unet1d import UNet1D
+from net.unet2d import UNet2D
 
 
 class SwinJSCC(nn.Module):
@@ -38,7 +38,7 @@ class SwinJSCC(nn.Module):
         self.model = args.model
         # feature_channels = encoder_kwargs["embed_dims"][-1]
         self.feature_denoiser = (
-            UNet1D(
+            UNet2D(
                 channels=encoder_kwargs["embed_dims"][-1],
                 hidden=encoder_kwargs["embed_dims"][-1],
                 depth=4,
