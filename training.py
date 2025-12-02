@@ -66,11 +66,11 @@ def train_one_epoch(
                 f"Epoch {epoch}",
                 f"Step [{batch_idx + 1}/{len(train_loader)}={process:.2f}%]",
                 f"Time {metrics['elapsed'].val:.3f}",
-                f"Loss {metrics['losses'].val:.3f} ({metrics['losses'].avg:.3f})",
-                f"CBR {metrics['cbrs'].val:.4f} ({metrics['cbrs'].avg:.4f})",
-                f"SNR {metrics['snrs'].val:.1f} ({metrics['snrs'].avg:.1f})",
-                f"PSNR {metrics['psnrs'].val:.3f} ({metrics['psnrs'].avg:.3f})",
-                f"MSSSIM {metrics['msssims'].val:.3f} ({metrics['msssims'].avg:.3f})",
+                f"Loss {metrics['losses'].val:.3f}",
+                f"CBR {metrics['cbrs'].val:.4f}",
+                f"SNR {metrics['snrs'].val:.1f}",
+                f"PSNR {metrics['psnrs'].val:.3f}",
+                f"MSSSIM {metrics['msssims'].val:.3f}",
                 f"Lr {config.learning_rate}",
             ]
 
@@ -147,17 +147,18 @@ def test(net, test_loader, CalcuSSIM, logger, args, config):
                         metrics["msssim"].update(msssim)
 
                     # --- logging ---
-                    log = " | ".join(
-                        [
-                            f"Time {metrics['elapsed'].val:.3f}",
-                            f"CBR {metrics['cbr'].val:.4f} ({metrics['cbr'].avg:.4f})",
-                            f"SNR {metrics['snr'].val:.1f}",
-                            f"SNR (denoised) {metrics['chan_param'].val:.2f} ({metrics['chan_param'].avg:.2f})",
-                            f"PSNR {metrics['psnr'].val:.3f} ({metrics['psnr'].avg:.3f})",
-                            f"MSSSIM {metrics['msssim'].val:.3f} ({metrics['msssim'].avg:.3f})",
-                            f"Lr {config.learning_rate}",
-                        ]
-                    )
+                    # log = " | ".join(
+                    #     [
+                    #         f"Time {metrics['elapsed'].val:.3f}",
+                    #         f"CBR {metrics['cbr'].val:.4f}",
+                    #         f"SNR {metrics['snr'].val:.1f}",
+                    #         f"SNR (denoised) {metrics['chan_param'].val:.2f}",
+                    #         f"PSNR {metrics['psnr'].val:.3f}",
+                    #         f"MSSSIM {metrics['msssim'].val:.3f}",
+                    #         f"Lr {config.learning_rate}",
+                    #     ]
+                    # )
+                    log = "Testing..."
                     logger.info(log)
 
             # --- store results ---
@@ -244,7 +245,11 @@ def train_one_epoch_denoiser(
 
         # (3) Self-consistency: D(feature + pred_noise) ≈ feature
         restored_twice, pred_noise_twice = model.feature_denoiser(
-            (feature + pred_noise).detach(), mask, real_snr
+            (feature + pred_noise).detach(),
+            mask,
+            real_snr,
+            model.encoder.H,
+            model.encoder.W,
         )
         self_loss = masked_mse_loss(restored_twice, feature, mask) + masked_mse_loss(
             pred_noise_twice, pred_noise_twice, mask
@@ -280,13 +285,13 @@ def train_one_epoch_denoiser(
         if global_step % config.print_step == 0:
             logger.info(
                 f"[Epoch {epoch} | Step {global_step}] "
-                f"Loss {metrics['losses'].val:.4f} ({metrics['losses'].avg:.4f}) | "
-                f"CBR {metrics['cbrs'].val:.4f} ({metrics['cbrs'].avg:.4f}) | "
-                f"SNR {metrics['snrs'].val:.2f} ({metrics['snrs'].avg:.2f}) | "
-                f"SNR(real) {metrics['real_snr'].val:.2f} ({metrics['real_snr'].avg:.2f}) | "
-                f"SNR(denoised) {metrics['chan_param'].val:.2f} ({metrics['chan_param'].avg:.2f}) | "
-                f"PSNR(recon) {metrics['psnr_recon'].val:.3f} ({metrics['psnr_recon'].avg:.3f}) | "
-                f"MSSSIM(recon) {metrics['msssim_recon'].val:.3f} ({metrics['msssim_recon'].avg:.3f}) | "
+                f"Loss {metrics['losses'].val:.4f} | "
+                f"CBR {metrics['cbrs'].val:.4f} | "
+                f"SNR {metrics['snrs'].val:.2f} | "
+                f"SNR(real) {metrics['real_snr'].val:.2f} | "
+                f"SNR(denoised) {metrics['chan_param'].val:.2f} | "
+                f"PSNR(recon) {metrics['psnr_recon'].val:.3f} | "
+                f"MSSSIM(recon) {metrics['msssim_recon'].val:.3f} | "
                 f"Orth {orth_loss.item():.4f} | MSE {mse_loss.item():.4f} | "
                 f"Recon {loss_G.item():.4f}"
             )
