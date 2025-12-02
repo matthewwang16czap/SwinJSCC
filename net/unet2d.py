@@ -59,20 +59,6 @@ class UpBlock2D(nn.Module):
 
 
 # -----------------------------
-# Channel mask helper
-# -----------------------------
-def apply_channel_mask(x, mask):
-    """
-    x: (B, C, H, W)
-    mask: (B, C) → broadcast to (B, C, 1, 1)
-    """
-    if mask is None:
-        return x
-    mask = mask[:, :, None, None]  # → (B, C, 1, 1)
-    return x * mask
-
-
-# -----------------------------
 # UNet2D
 # -----------------------------
 class UNet2D(nn.Module):
@@ -129,29 +115,44 @@ class UNet2D(nn.Module):
     # ------------
     # Helpers
     # ------------
-    def reshape_input(self, x):
+    def reshape_input(self, x, H=None, W=None):
         """
         Accepts:
-            (B, N, C)  where N = H*W
-            (B, H, W, C)
-            (B, C, H, W)
-        Returns BCHW
+            x: (B, N, C)  with explicit H, W provided
+        Returns:
+            x in BCHW format, and the known H, W.
         """
-        if x.dim() == 3:
-            B, N, C = x.shape
-            HW = int(N**0.5)
-            assert HW * HW == N
-            x = x.view(B, HW, HW, C)
+        if x.dim() != 3:
+            raise ValueError("Input must have shape (B, N, C)")
+        B, N, C = x.shape
+        if H is None or W is None:
+            raise ValueError(
+                "When passing (B, N, C), you MUST provide H and W explicitly."
+            )
+        if H * W != N:
+            raise ValueError(
+                f"H * W must match N. Got H={H}, W={W}, H*W={H*W}, but N={N}"
+            )
 
-        if x.dim() == 4 and x.shape[-1] != x.shape[1]:  # BHWC
-            x = x.permute(0, 3, 1, 2)
-
-        B, C, H, W = x.shape
+        # reshape to BHWC first
+        x = x.view(B, H, W, C)
+        # permute to BCHW
+        x = x.permute(0, 3, 1, 2).contiguous()  # (B, C, H, W)
         return x, H, W
 
-    def forward(self, x, mask=None, snr=10.0):
+    def apply_channel_mask(self, x, mask):
+        """
+        x: (B, C, H, W)
+        mask: (B, C) → broadcast to (B, C, 1, 1)
+        """
+        if mask is None:
+            return x
+        mask = mask[:, :, None, None]  # → (B, C, 1, 1)
+        return x * mask
+
+    def forward(self, x, mask=None, snr=10.0, H=None, W=None):
         # Convert input to BCHW
-        x, H, W = self.reshape_input(x)
+        x, H, W = self.reshape_input(x, H, W)
         B, C, _, _ = x.shape
 
         # Prepare channel mask (B, C)
@@ -164,7 +165,7 @@ class UNet2D(nn.Module):
                 raise ValueError("Mask must be (B,C) or (B,N,C)")
 
         # Apply mask to input
-        x = apply_channel_mask(x, mask)
+        x = self.apply_channel_mask(x, mask)
 
         # ---------------- Encoder ----------------
         x = self.first_enc(x)
@@ -201,8 +202,8 @@ class UNet2D(nn.Module):
         x = self.outc(x)
 
         clean, noise = x.chunk(2, dim=1)  # (B,C,H,W)
-        clean = apply_channel_mask(clean, mask)
-        noise = apply_channel_mask(noise, mask)
+        clean = self.apply_channel_mask(clean, mask)
+        noise = self.apply_channel_mask(noise, mask)
 
         # back to (B,N,C)
         clean = clean.permute(0, 2, 3, 1).reshape(B, H * W, C)
@@ -235,7 +236,7 @@ if __name__ == "__main__":
 
     # Forward pass
     with torch.no_grad():
-        clean, noise = model(noisy, mask)
+        clean, noise = model(noisy, mask, 10, H=16, W=16)
 
     print(f"Input:  {noisy.shape}")
     print(f"Clean:  {clean.shape}")
@@ -259,7 +260,7 @@ if __name__ == "__main__":
         torch.cuda.reset_peak_memory_stats()
 
         with torch.no_grad():
-            clean, noise = model(noisy)
+            clean, noise = model(noisy, mask, 10, H=16, W=16)
 
         peak_mem = torch.cuda.max_memory_allocated() / 1024**3
         print(f"✓ Peak GPU memory: {peak_mem:.2f} GB")

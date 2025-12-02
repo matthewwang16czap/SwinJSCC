@@ -111,7 +111,8 @@ def test(net, test_loader, CalcuSSIM, logger, args, config):
 
                     start_time = time.time()
 
-                    input = data[0].to(config.device, non_blocking=True)
+                    input = data[0] if args.trainset == "CIFAR10" else data
+                    input = input.to(config.device, non_blocking=True)
 
                     (
                         recon_image,
@@ -287,7 +288,6 @@ def train_one_epoch_denoiser(
                 f"PSNR(recon) {metrics['psnr_recon'].val:.3f} ({metrics['psnr_recon'].avg:.3f}) | "
                 f"MSSSIM(recon) {metrics['msssim_recon'].val:.3f} ({metrics['msssim_recon'].avg:.3f}) | "
                 f"Orth {orth_loss.item():.4f} | MSE {mse_loss.item():.4f} | "
-                f"MeanReg {noise_mean_reg.item():.6f} | Self {self_loss.item():.4f} | "
                 f"Recon {loss_G.item():.4f}"
             )
 

@@ -115,7 +115,7 @@ class SwinJSCC(nn.Module):
         # --- Pass noisy feature through feature_denoiser network ---
         if self.feature_denoiser:
             restored_feature, pred_noise = self.feature_denoiser(
-                noisy_feature, mask, real_snr
+                noisy_feature, mask, real_snr, self.encoder.H, self.encoder.W
             )  # predict noise
             # adapt restored feature to decoder
             restored_feature = self.adapter(restored_feature, noisy_feature)

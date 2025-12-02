@@ -6,7 +6,7 @@ import torch.optim as optim
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 from net.network import SwinJSCC
-from data.datasets_ddp import get_loader
+from data.datasets_rev import get_loader
 from utils import *
 from loss.distortion import *
 from config import Config

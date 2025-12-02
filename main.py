@@ -11,7 +11,7 @@ from loss.distortion import *
 from config import Config
 from training import *
 
-
+## Main issue: network fix input image size
 if __name__ == "__main__":
     # Parser
     parser = argparse.ArgumentParser(description="SwinJSCC")
