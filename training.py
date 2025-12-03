@@ -158,8 +158,7 @@ def test(net, test_loader, CalcuSSIM, logger, args, config):
                     #         f"Lr {config.learning_rate}",
                     #     ]
                     # )
-                    log = "Testing..."
-                    logger.info(log)
+                    # logger.info(log)
 
             # --- store results ---
             results_snr[i, j] = metrics["snr"].avg
@@ -172,6 +171,7 @@ def test(net, test_loader, CalcuSSIM, logger, args, config):
             for m in metrics.values():
                 m.clear()
 
+    logger.info("Start Test:")
     logger.info(f"SNR: {results_snr.round(1).tolist()}")
     logger.info(f"SNR (denoised): {results_chan_param.round(2).tolist()}")
     logger.info(f"CBR: {results_cbr.round(4).tolist()}")
