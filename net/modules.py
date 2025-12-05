@@ -542,6 +542,22 @@ class SwinTransformerBlock(nn.Module):
         return flops
 
 
+class AdaptiveModulator(nn.Module):
+    def __init__(self, M):
+        super(AdaptiveModulator, self).__init__()
+        self.fc = nn.Sequential(
+            nn.Linear(1, M),
+            nn.ReLU(),
+            nn.Linear(M, M),
+            nn.ReLU(),
+            nn.Linear(M, M),
+            nn.Sigmoid(),
+        )
+
+    def forward(self, snr):
+        return self.fc(snr)
+
+
 class ResidualAdapter(nn.Module):
     def __init__(self, dim, bottleneck=128):
         super().__init__()

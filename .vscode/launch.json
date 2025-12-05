@@ -23,8 +23,8 @@
                 "--model_size", "base",
                 // "--training",
                 // "--denoise-training",
-                "--stage", "1",
-                "--denoise",
+                // "--stage", "1",
+                // "--denoise",
                 
             ],
 

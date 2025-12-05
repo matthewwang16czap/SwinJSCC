@@ -76,22 +76,6 @@ class BasicLayer(nn.Module):
             self.downsample.input_resolution = (H * 2, W * 2)
 
 
-class AdaptiveModulator(nn.Module):
-    def __init__(self, M):
-        super(AdaptiveModulator, self).__init__()
-        self.fc = nn.Sequential(
-            nn.Linear(1, M),
-            nn.ReLU(),
-            nn.Linear(M, M),
-            nn.ReLU(),
-            nn.Linear(M, M),
-            nn.Sigmoid(),
-        )
-
-    def forward(self, snr):
-        return self.fc(snr)
-
-
 class SwinJSCC_Encoder(nn.Module):
     def __init__(
         self,
@@ -151,22 +135,22 @@ class SwinJSCC_Encoder(nn.Module):
         if C != None:
             self.head_list = nn.Linear(embed_dims[-1], C)
         self.apply(self._init_weights)
-        # Channel ModNet and Rate  ModNet
+        # Channel ModNet or Rate ModNet
+        self.bm_list = nn.ModuleList()
+        self.sm_list = nn.ModuleList()
+        self.sm_list.append(
+            nn.Linear(self.embed_dims[len(embed_dims) - 1], self.hidden_dim)
+        )
+        for i in range(layer_num):
+            if i == layer_num - 1:
+                outdim = self.embed_dims[len(embed_dims) - 1]
+            else:
+                outdim = self.hidden_dim
+            self.bm_list.append(AdaptiveModulator(self.hidden_dim))
+            self.sm_list.append(nn.Linear(self.hidden_dim, outdim))
+        self.sigmoid = nn.Sigmoid()
         if model == "SwinJSCC_w/_SAandRA":
-            self.bm_list = nn.ModuleList()
-            self.sm_list = nn.ModuleList()
-            self.sm_list.append(
-                nn.Linear(self.embed_dims[len(embed_dims) - 1], self.hidden_dim)
-            )
-            for i in range(layer_num):
-                if i == layer_num - 1:
-                    outdim = self.embed_dims[len(embed_dims) - 1]
-                else:
-                    outdim = self.hidden_dim
-                self.bm_list.append(AdaptiveModulator(self.hidden_dim))
-                self.sm_list.append(nn.Linear(self.hidden_dim, outdim))
-            self.sigmoid = nn.Sigmoid()
-
+            # extra channel modnet
             self.bm_list1 = nn.ModuleList()
             self.sm_list1 = nn.ModuleList()
             self.sm_list1.append(
@@ -180,136 +164,93 @@ class SwinJSCC_Encoder(nn.Module):
                 self.bm_list1.append(AdaptiveModulator(self.hidden_dim))
                 self.sm_list1.append(nn.Linear(self.hidden_dim, outdim))
             self.sigmoid1 = nn.Sigmoid()
-        else:
-            self.bm_list = nn.ModuleList()
-            self.sm_list = nn.ModuleList()
-            self.sm_list.append(
-                nn.Linear(self.embed_dims[len(embed_dims) - 1], self.hidden_dim)
-            )
-            for i in range(layer_num):
-                if i == layer_num - 1:
-                    outdim = self.embed_dims[len(embed_dims) - 1]
-                else:
-                    outdim = self.hidden_dim
-                self.bm_list.append(AdaptiveModulator(self.hidden_dim))
-                self.sm_list.append(nn.Linear(self.hidden_dim, outdim))
-            self.sigmoid = nn.Sigmoid()
+
+    def apply_modulation(self, x, cond, sm_list, bm_list, sigmoid, B, H, W):
+        HW_scale = H * W // (self.num_layers**4)
+
+        temp = None
+        for i in range(self.layer_num):
+            temp = sm_list[i](x.detach() if i == 0 else temp)
+            bm = bm_list[i](cond).unsqueeze(1).expand(-1, HW_scale, -1)
+            temp = temp * bm
+        mod = sigmoid(sm_list[-1](temp))
+        return x * mod, mod
+
+    def apply_rate_mask(self, x, mod_val, rate):
+        B, HW, C = mod_val.shape
+        device = x.device
+        mod_val = mod_val.to(device)
+
+        mask_vals = mod_val.sum(dim=1)  # (B, C)
+        sorted, idx = mask_vals.sort(dim=1, descending=True)  # top-k
+        topk = idx[:, :rate]  # (B, rate)
+
+        # flatten index trick
+        add = torch.arange(0, B * C, C, device=device).unsqueeze(1).int()
+        flat_indices = topk + add
+
+        # build mask
+        mask = torch.zeros(mask_vals.size(), device=device).reshape(-1)
+        mask[flat_indices.reshape(-1)] = 1
+        mask = mask.reshape(B, C)
+        mask = mask.unsqueeze(1).expand(-1, HW, -1)
+        return x * mask, mask
 
     def forward(self, x, snr, rate, model):
         B, C, H, W = x.size()
         device = x.device
+
+        # backbone
         x = self.patch_embed(x)
-        for i_layer, layer in enumerate(self.layers):
+        for layer in self.layers:
             x = layer(x)
         x = self.norm(x)
 
         if model == "SwinJSCC_w/o_SAandRA":
-            x = self.head_list(x)
-            return x
+            return self.head_list(x)
 
-        elif model == "SwinJSCC_w/_SA":
-            snr_cuda = torch.tensor(snr, dtype=torch.float).to(device)
-            snr_batch = snr_cuda.unsqueeze(0).expand(B, -1)
-            for i in range(self.layer_num):
-                if i == 0:
-                    temp = self.sm_list[i](x.detach())
-                else:
-                    temp = self.sm_list[i](temp)
+        # prepare condition tensors
+        snr_batch = (
+            torch.tensor(snr, dtype=torch.float, device=device)
+            .unsqueeze(0)
+            .expand(B, -1)
+        )
+        rate_batch = (
+            torch.tensor(rate, dtype=torch.float, device=device)
+            .unsqueeze(0)
+            .expand(B, -1)
+        )
 
-                bm = (
-                    self.bm_list[i](snr_batch)
-                    .unsqueeze(1)
-                    .expand(-1, H * W // (self.num_layers**4), -1)
-                )
-                temp = temp * bm
-            mod_val = self.sigmoid(self.sm_list[-1](temp))
-            x = x * mod_val
-            x = self.head_list(x)
-            return x
-
-        elif model == "SwinJSCC_w/_RA":
-            rate_cuda = torch.tensor(rate, dtype=torch.float).to(device)
-            rate_batch = rate_cuda.unsqueeze(0).expand(B, -1)
-            for i in range(self.layer_num):
-                if i == 0:
-                    temp = self.sm_list[i](x.detach())
-                else:
-                    temp = self.sm_list[i](temp)
-
-                bm = (
-                    self.bm_list[i](rate_batch)
-                    .unsqueeze(1)
-                    .expand(-1, H * W // (self.num_layers**4), -1)
-                )
-                temp = temp * bm
-            mod_val = self.sigmoid(self.sm_list[-1](temp))
-            x = x * mod_val
-            mask = torch.sum(mod_val, dim=1)
-            sorted, indices = mask.sort(dim=1, descending=True)
-            c_indices = indices[:, :rate]
-            add = (
-                torch.Tensor(range(0, B * x.size()[2], x.size()[2]))
-                .unsqueeze(1)
-                .repeat(1, rate)
+        if model == "SwinJSCC_w/_SA":
+            mod_x, mod = self.apply_modulation(
+                x, snr_batch, self.sm_list, self.bm_list, self.sigmoid, B, H, W
             )
-            c_indices = c_indices + add.int().to(device)
-            mask = torch.zeros(mask.size()).reshape(-1).to(device)
-            mask[c_indices.reshape(-1)] = 1
-            mask = mask.reshape(B, x.size()[2])
-            mask = mask.unsqueeze(1).expand(-1, H * W // (self.num_layers**4), -1)
-            x = x * mask
-            return x, mask
+            return self.head_list(mod_x)
 
-        elif model == "SwinJSCC_w/_SAandRA":
-            snr_cuda = torch.tensor(snr, dtype=torch.float).to(device)
-            rate_cuda = torch.tensor(rate, dtype=torch.float).to(device)
-            snr_batch = snr_cuda.unsqueeze(0).expand(B, -1)
-            rate_batch = rate_cuda.unsqueeze(0).expand(B, -1)
-            for i in range(self.layer_num):
-                if i == 0:
-                    temp = self.sm_list1[i](x.detach())
-                else:
-                    temp = self.sm_list1[i](temp)
-
-                bm = (
-                    self.bm_list1[i](snr_batch)
-                    .unsqueeze(1)
-                    .expand(-1, H * W // (self.num_layers**4), -1)
-                )
-                temp = temp * bm
-            mod_val1 = self.sigmoid1(self.sm_list1[-1](temp))
-            x = x * mod_val1
-
-            for i in range(self.layer_num):
-                if i == 0:
-                    temp = self.sm_list[i](x.detach())
-                else:
-                    temp = self.sm_list[i](temp)
-
-                bm = (
-                    self.bm_list[i](rate_batch)
-                    .unsqueeze(1)
-                    .expand(-1, H * W // (self.num_layers**4), -1)
-                )
-                temp = temp * bm
-            mod_val = self.sigmoid(self.sm_list[-1](temp))
-            x = x * mod_val
-            mask = torch.sum(mod_val, dim=1)
-            sorted, indices = mask.sort(dim=1, descending=True)
-            c_indices = indices[:, :rate]
-            add = (
-                torch.Tensor(range(0, B * x.size()[2], x.size()[2]))
-                .unsqueeze(1)
-                .repeat(1, rate)
+        if model == "SwinJSCC_w/_RA":
+            mod_x, mod = self.apply_modulation(
+                x, rate_batch, self.sm_list, self.bm_list, self.sigmoid, B, H, W
             )
-            c_indices = c_indices + add.int().to(device)
-            mask = torch.zeros(mask.size()).reshape(-1).to(device)
-            mask[c_indices.reshape(-1)] = 1
-            mask = mask.reshape(B, x.size()[2])
-            mask = mask.unsqueeze(1).expand(-1, H * W // (self.num_layers**4), -1)
+            return self.apply_rate_mask(mod_x, mod, rate)
 
-            x = x * mask
-            return x, mask
+        if model == "SwinJSCC_w/_SAandRA":
+            # step 1: SNR
+            mod_x, mod_snr = self.apply_modulation(
+                x, snr_batch, self.sm_list1, self.bm_list1, self.sigmoid1, B, H, W
+            )
+
+            # step 2: RATE
+            mod_x, mod_rate = self.apply_modulation(
+                mod_x,
+                rate_batch,
+                self.sm_list,
+                self.bm_list,
+                self.sigmoid,
+                B,
+                H,
+                W,
+            )
+            return self.apply_rate_mask(mod_x, mod_rate, rate)
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):

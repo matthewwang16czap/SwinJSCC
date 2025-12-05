@@ -1,6 +1,5 @@
 from net.modules import *
 import torch
-from net.encoder import SwinTransformerBlock, AdaptiveModulator
 import datetime
 
 
@@ -164,62 +163,40 @@ class SwinJSCC_Decoder(nn.Module):
                 self.sm_list.append(nn.Linear(self.hidden_dim, outdim))
             self.sigmoid = nn.Sigmoid()
 
+    def apply_modulation(self, x, snr, B, L, C, device):
+        snr_cuda = torch.tensor(snr, dtype=torch.float, device=device)
+        snr_batch = snr_cuda.unsqueeze(0).expand(B, -1)
+        temp = None
+        for i in range(self.layer_num):
+            temp = self.sm_list[i](x.detach() if i == 0 else temp)
+            bm = self.bm_list[i](snr_batch).unsqueeze(1).expand(-1, L, -1)
+            temp = temp * bm
+        mod_val = self.sigmoid(self.sm_list[-1](temp))
+        return x * mod_val
+
     def forward(self, x, snr, model):
         if model == "SwinJSCC_w/o_SAandRA":
             x = self.head_list(x)
-            for i_layer, layer in enumerate(self.layers):
-                x = layer(x)
-            B, L, N = x.shape
-            x = x.reshape(B, self.H, self.W, N).permute(0, 3, 1, 2)
-            return x
 
         elif model == "SwinJSCC_w/_SA":
             B, L, C = x.size()
             device = x.device
             x = self.head_list(x)
-            snr_cuda = torch.tensor(snr, dtype=torch.float).to(device)
-            snr_batch = snr_cuda.unsqueeze(0).expand(B, -1)
-            for i in range(self.layer_num):
-                if i == 0:
-                    temp = self.sm_list[i](x.detach())
-                else:
-                    temp = self.sm_list[i](temp)
-                bm = self.bm_list[i](snr_batch).unsqueeze(1).expand(-1, L, -1)
-                temp = temp * bm
-            mod_val = self.sigmoid(self.sm_list[-1](temp))
-            x = x * mod_val
-            for i_layer, layer in enumerate(self.layers):
-                x = layer(x)
-            B, L, N = x.shape
-            x = x.reshape(B, self.H, self.W, N).permute(0, 3, 1, 2)
-            return x
+            x = self.apply_modulation(x, snr, B, L, C, device)
 
         elif model == "SwinJSCC_w/_RA":
-            for i_layer, layer in enumerate(self.layers):
-                x = layer(x)
-            B, L, N = x.shape
-            x = x.reshape(B, self.H, self.W, N).permute(0, 3, 1, 2)
-            return x
+            pass
 
         elif model == "SwinJSCC_w/_SAandRA":
             B, L, C = x.size()
             device = x.device
-            snr_cuda = torch.tensor(snr, dtype=torch.float).to(device)
-            snr_batch = snr_cuda.unsqueeze(0).expand(B, -1)
-            for i in range(self.layer_num):
-                if i == 0:
-                    temp = self.sm_list[i](x.detach())
-                else:
-                    temp = self.sm_list[i](temp)
-                bm = self.bm_list[i](snr_batch).unsqueeze(1).expand(-1, L, -1)
-                temp = temp * bm
-            mod_val = self.sigmoid(self.sm_list[-1](temp))
-            x = x * mod_val
-            for i_layer, layer in enumerate(self.layers):
-                x = layer(x)
-            B, L, N = x.shape
-            x = x.reshape(B, self.H, self.W, N).permute(0, 3, 1, 2)
-            return x
+            x = self.apply_modulation(x, snr, B, L, C, device)
+
+        for i_layer, layer in enumerate(self.layers):
+            x = layer(x)
+        B, L, N = x.shape
+        x = x.reshape(B, self.H, self.W, N).permute(0, 3, 1, 2)
+        return x
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
