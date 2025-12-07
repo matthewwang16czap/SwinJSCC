@@ -2,29 +2,38 @@ import torch
 import torch.nn.functional as F
 
 
-def masked_mse_loss(pred, target, mask):
+def masked_mse_loss(pred, target, mask=None, noise=None, eps=1e-6):
     """
-    pred:  [B, N, C] restored feature
-    target:       [B, N, C] ground-truth feature
-    mask:          [B, N, C] 1 for active entries, 0 for masked
+    pred:  [B, N, C]
+    target: [B, N, C]
+    mask:  [B, N, C]  (1 keeps a channel, 0 masks it)
+    noise: [B, N, C]
     """
+
+    # main masked mse
     diff = (pred - target) ** 2
     diff = diff * mask
-    loss = diff.sum() / mask.sum().clamp(min=1)  # avoid div by 0
+    denom = mask.sum().clamp(min=1) if mask is not None else 1
+    loss = diff.sum() / denom
+
+    if noise is not None:
+        # compute masked L2 norm of noise (balanced same as loss)
+        noise_norm = (noise**2).sum(dim=[1, 2])  # [B]
+        noise_norm = (noise_norm / denom).sqrt()  # normalized L2
+
+        # convert noise into loss downweighting factor
+        # large noise → small weight
+        weight = 1.0 / (1.0 + noise_norm)  # [B]
+
+        # average over batch
+        loss = loss * weight.mean()
+
     return loss
-
-
-# def masked_orthogonal_loss(pred, target, mask):
-#     error = (target - pred) ** 2
-#     M = (pred**2) * error
-#     M = M * mask
-#     loss = M.sum() / mask.sum().clamp(min=1)
-#     return loss
 
 
 def masked_orthogonal_loss(restored_feature, noise, pred_noise, mask, alpha=0.8):
     """
-    Compute orthogonality loss to encourage the restored feature 
+    Compute orthogonality loss to encourage the restored feature
     to be orthogonal to both true and predicted noise components.
 
     restored_feature : [B, N, C]  -- model output (predicted clean feature)
@@ -54,12 +63,12 @@ def masked_orthogonal_loss(restored_feature, noise, pred_noise, mask, alpha=0.8)
     # --- 4. Compute cosine correlation with true noise ---
     #     → measures alignment between restored feature and actual noise
     corr_true = (restored_feature * noise).sum(dim=2)  # [B, N]
-    loss_true = (corr_true ** 2).mean()                # squared → penalize correlation magnitude
+    loss_true = (corr_true**2).mean()  # squared → penalize correlation magnitude
 
     # --- 5. Compute cosine correlation with predicted noise ---
     #     → ensures model’s internal “noise direction” also becomes orthogonal
     corr_pred = (restored_feature * pred_noise).sum(dim=2)  # [B, N]
-    loss_pred = (corr_pred ** 2).mean()
+    loss_pred = (corr_pred**2).mean()
 
     # --- 6. Blend the two orthogonality losses ---
     #     α controls the balance:
@@ -68,4 +77,3 @@ def masked_orthogonal_loss(restored_feature, noise, pred_noise, mask, alpha=0.8)
 
     # --- 7. Return the scalar orthogonality loss ---
     return loss
-

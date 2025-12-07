@@ -239,21 +239,14 @@ def train_one_epoch_denoiser(
         )
 
         # (2) MSE between restored_feature and ground-truth feature
-        mse_loss = masked_mse_loss(restored_feature, feature, mask) + masked_mse_loss(
-            pred_noise, noise, mask
-        )
+        mse_loss = masked_mse_loss(restored_feature, feature, mask, noise)
 
         # (3) Self-consistency: D(feature + pred_noise) ≈ feature
         restored_twice, pred_noise_twice = model.feature_denoiser(
             (feature + pred_noise).detach(),
             mask,
-            real_snr,
-            model.encoder.H,
-            model.encoder.W,
         )
-        self_loss = masked_mse_loss(restored_twice, feature, mask) + masked_mse_loss(
-            pred_noise_twice, pred_noise_twice, mask
-        )
+        self_loss = masked_mse_loss(restored_twice, feature, mask, pred_noise)
 
         # ---------------------- Combine ---------------------- #
         a_1, a_2, a_3, a_4 = config.alpha_losses
