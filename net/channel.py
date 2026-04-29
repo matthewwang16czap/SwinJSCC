@@ -87,7 +87,7 @@ class Channel(nn.Module):
             # FlatFadingChannel expects (batch, num_tx_ant).
             # Reshape (B*N, C2) so each complex "symbol" is a 1-antenna vector,
             # apply the flat-fading block, then reshape back.
-            flat = xc.reshape(B * N, C2)  # (B*N, C2)
+            flat = xc.reshape(B * N * C2, 1)  # treat each symbol independently
             flat_out = self._sionna_rayleigh(
                 flat, no
             )  # (B*N, C2)  [SISO: num_rx_ant=C2? No…]
