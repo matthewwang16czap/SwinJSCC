@@ -55,17 +55,19 @@ class SwinJSCC(nn.Module):
             if self.config.pass_channel
             else feature
         )
-        return noisy_feature, feature_H, feature_W
+        return noisy_feature, mask, feature_H, feature_W
 
     def decoder_side_processing(
         self,
         input_image,
         noisy_feature,
+        mask,
         feature_H,
         feature_W,
         valid,
         snr=None,
     ):
+        noisy_feature = noisy_feature * mask
         noisy_feature = self.decoder_snr_modulator(noisy_feature, snr)
         # Decoding
         recon_images = self.decoder(
@@ -79,21 +81,20 @@ class SwinJSCC(nn.Module):
 
     def forward(self, input_image, valid, snr=None, cbr=None):
         snr_tensor = (
-            torch.tensor([[snr]], device=input_image.device)
-            if snr is not None
-            else None
+            torch.tensor([snr], device=input_image.device) if snr is not None else None
         )
         cbr_tensor = (
-            torch.tensor([[float(cbr)]], device=input_image.device)
+            torch.tensor([float(cbr)], device=input_image.device)
             if cbr is not None
             else None
         )
-        noisy_feature, feature_H, feature_W = self.encoder_side_processing(
+        noisy_feature, mask, feature_H, feature_W = self.encoder_side_processing(
             input_image, snr=snr_tensor, cbr=cbr_tensor
         )
         recon_images, loss, metrics = self.decoder_side_processing(
             input_image,
             noisy_feature,
+            mask,
             feature_H,
             feature_W,
             valid,

@@ -25,10 +25,10 @@ class Config:
         self.plot_step = 10000
         self.save_filename = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.workdir = f"./history/{self.save_filename}"
-        self.homedir = "/home/matthewwang16czap/"
-        # self.homedir = "/home/ubuntu/"
-        # self.pretrained_model_path = "./pretrained/SwinJSCC.model"
-        self.pretrained_model_path = None
+        # self.homedir = "/home/matthewwang16czap/"
+        self.homedir = "/home/ubuntu/"
+        self.pretrained_model_path = "./pretrained/step3.model"
+        # self.pretrained_model_path = None
         self.log_dir = f"{self.workdir}/Log_{self.save_filename}.log"
         self.models_dir = f"{self.workdir}/models"
         self.logger = None

@@ -11,6 +11,7 @@ from utils.ddp_utils import cleanup_ddp, initialize_ddp
 from utils.logger_utils import logger_configuration
 from utils.parser_utils import create_parser
 from utils.torch_utils import load_weights, save_model, seed_torch
+from utils.model_utils import freeze_model
 
 torch.backends.cuda.enable_flash_sdp(True)
 torch.backends.cuda.enable_mem_efficient_sdp(True)
@@ -39,6 +40,7 @@ if __name__ == "__main__":
     # Load weights if needed
     if config.pretrained_model_path is not None:
         load_weights(net, config.pretrained_model_path)
+    freeze_model(net, config)
     # DDP wrap model
     if ddp_env["world_size"] > 1:
         net = DDP(

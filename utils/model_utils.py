@@ -16,6 +16,12 @@ def dequantize_symmetric(x_q, scale):
     return x_q.float() * scale
 
 
+def freeze_model(net, config):
+    # lpips loss model freezing
+    for name, param in net.image_loss.lpips.named_parameters():
+        param.requires_grad = False
+
+
 def cbr_to_channel(cbr, image_dims=(3, 256, 256), patch_size=2, downsample_layers=4):
     image_numel = reduce(mul, image_dims)
     # feature size is equal to (H*W) / (patch_size*(2^downsample_layers))^2
