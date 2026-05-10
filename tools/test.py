@@ -6,6 +6,7 @@ from collections import defaultdict
 from utils.data_utils import get_batch_data
 from utils.logger_utils import get_logger_dir, format_value, metric_order
 from utils.universal_utils import get_path
+from utils.model_utils import mask_cbr_overhead
 
 
 def test(net, test_loader, logger, config):
@@ -49,7 +50,20 @@ def test(net, test_loader, logger, config):
                     dist.all_reduce(tensor, op=dist.ReduceOp.SUM)
                 metrics[key] = (tensor / (counts * world_size)).item()
             # Store result
-            results.append({"snr": snr, "cbr": float(cbr), **metrics})
+            results.append(
+                {
+                    "snr": snr,
+                    "cbr": float(cbr)
+                    + mask_cbr_overhead(
+                        cbr,
+                        snr,
+                        config.image_dims,
+                        config.patch_size,
+                        config.downsample_layers,
+                    ),
+                    **metrics,
+                }
+            )
     # logging
     if rank == 0 and logger is not None:
         logger.info("Start Test:")
